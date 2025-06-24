@@ -24,7 +24,7 @@ Create an immersive arcade environment where users can:
 am-arcade/
 ├── arcade-environment/    # Main 3D arcade room (Elelzedel)
 ├── games/                 # Individual mini-games
-│   └── tank-game/        # Artillery trajectory game (AceJetPilot)
+│   └── tank-game/        # Artillery trajectory game (ajclausen)
 ├── shared/               # Shared utilities and assets
 └── README.md
 ```
@@ -82,8 +82,8 @@ The arcade environment aesthetic is inspired by [Jesse Zhou's portfolio](https:/
 ## 🤝 Contributors
 
 - **Elelzedel** - Arcade environment and Three.js integration
-- **AceJetPilot** - Tank game development and gameplay mechanics
+- **ajclausen** - Tank game development and gameplay mechanics
 
 ---
 
-*"Worst case, it doesn't work out and we learned something."* - AceJetPilot
+*"Worst case, it doesn't work out and we learned something."* - ajclausen

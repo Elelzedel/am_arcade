@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank Artillery Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #87CEEB;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #gameCanvas {
+            border: 2px solid #333;
+            background-color: #87CEEB;
+            display: block;
+        }
+        #gameUI {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        .player-info {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+        }
+        .controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            text-align: center;
+        }
+        .wind-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1024" height="576"></canvas>
+        
+        <div id="gameUI">
+            <div class="player-info" id="player1Info">
+                <h3>Player 1</h3>
+                <p>Lives: <span id="player1Lives">3</span></p>
+            </div>
+            <div class="player-info" id="player2Info">
+                <h3>Player 2</h3>
+                <p>Lives: <span id="player2Lives">3</span></p>
+            </div>
+        </div>
+        
+        <div class="wind-indicator">
+            <p>Wind: <span id="windSpeed">0</span> mph</p>
+            <p><span id="windDirection">→</span></p>
+        </div>
+        
+        <div class="controls">
+            <p>Angle: <span id="angleDisplay">45</span>° | Power: <span id="powerDisplay">50</span>%</p>
+            <p>Use ↑↓ for angle, ←→ for power, SPACE to fire</p>
+        </div>
+    </div>
+</body>
+</html>
