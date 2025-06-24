@@ -81,7 +81,13 @@ export default class Terrain {
     draw(ctx) {
         ctx.save();
         
-        ctx.fillStyle = '#8B7355';
+        // Create gradient for terrain
+        const gradient = ctx.createLinearGradient(0, this.height * 0.5, 0, this.height);
+        gradient.addColorStop(0, '#1a1a3e');
+        gradient.addColorStop(0.5, '#2d1b69');
+        gradient.addColorStop(1, '#0a0a1e');
+        
+        ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(0, this.height);
         
@@ -93,8 +99,11 @@ export default class Terrain {
         ctx.closePath();
         ctx.fill();
         
-        ctx.strokeStyle = '#654321';
+        // Add subtle glow to terrain edge
+        ctx.strokeStyle = 'rgba(138, 43, 226, 0.3)';
         ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(138, 43, 226, 0.5)';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
         ctx.moveTo(this.points[0].x, this.points[0].y);
         
@@ -103,6 +112,16 @@ export default class Terrain {
         });
         
         ctx.stroke();
+        
+        // Add texture dots
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+        for (let i = 0; i < 200; i++) {
+            const x = Math.random() * this.width;
+            const y = this.getHeightAt(x) + Math.random() * (this.height - this.getHeightAt(x));
+            ctx.beginPath();
+            ctx.arc(x, y, Math.random() * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
         
         ctx.restore();
     }

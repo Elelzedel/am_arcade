@@ -3,85 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tank Artillery Game</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #87CEEB;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
-        }
-        #gameContainer {
-            position: relative;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        #gameCanvas {
-            border: 2px solid #333;
-            background-color: #87CEEB;
-            display: block;
-        }
-        #gameUI {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        .player-info {
-            margin-bottom: 10px;
-            padding: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 5px;
-        }
-        .controls {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 5px;
-            color: white;
-            text-align: center;
-        }
-        .wind-indicator {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-            color: white;
-        }
-    </style>
+    <title>Tank Artillery - Modern Edition</title>
 </head>
 <body>
-    <div id="gameContainer">
+    <!-- Main Menu -->
+    <div id="mainMenu" class="menu-screen">
+        <div class="menu-container">
+            <h1 class="menu-title">Tank Artillery</h1>
+            <p class="menu-subtitle">Choose your battle mode</p>
+            
+            <div class="menu-options">
+                <button class="menu-button" id="multiplayerBtn" disabled>
+                    <div class="button-icon">🌐</div>
+                    <div class="button-content">
+                        <h3>Multiplayer</h3>
+                        <p>Battle online opponents</p>
+                        <span class="coming-soon">Coming Soon</span>
+                    </div>
+                </button>
+                
+                <button class="menu-button" id="singleplayerBtn">
+                    <div class="button-icon">🤖</div>
+                    <div class="button-content">
+                        <h3>Single Player</h3>
+                        <p>Challenge the AI</p>
+                    </div>
+                </button>
+                
+                <button class="menu-button" id="selfplayBtn">
+                    <div class="button-icon">🎮</div>
+                    <div class="button-content">
+                        <h3>Self Play</h3>
+                        <p>Control both tanks</p>
+                    </div>
+                </button>
+            </div>
+            
+            <!-- Difficulty Selector -->
+            <div class="difficulty-selector" id="difficultySelector" style="display: none;">
+                <h3 class="difficulty-title">Select Difficulty</h3>
+                <div class="difficulty-options">
+                    <button class="difficulty-button" data-difficulty="easy">
+                        <span class="difficulty-icon">🌱</span>
+                        <span>Easy</span>
+                    </button>
+                    <button class="difficulty-button" data-difficulty="medium">
+                        <span class="difficulty-icon">⚔️</span>
+                        <span>Medium</span>
+                    </button>
+                    <button class="difficulty-button" data-difficulty="hard">
+                        <span class="difficulty-icon">🔥</span>
+                        <span>Hard</span>
+                    </button>
+                    <button class="difficulty-button" data-difficulty="impossible">
+                        <span class="difficulty-icon">💀</span>
+                        <span>Impossible</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="gameContainer" style="display: none;">
         <canvas id="gameCanvas" width="1024" height="576"></canvas>
         
-        <div id="gameUI">
-            <div class="player-info" id="player1Info">
-                <h3>Player 1</h3>
-                <p>Lives: <span id="player1Lives">3</span></p>
-            </div>
-            <div class="player-info" id="player2Info">
-                <h3>Player 2</h3>
-                <p>Lives: <span id="player2Lives">3</span></p>
+        <!-- Player 1 Card -->
+        <div class="player-card left" id="player1Card">
+            <div class="player-avatar player1">🎮</div>
+            <div class="player-name">You</div>
+            <div class="player-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Lives</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player1Health" style="width: 100%"></div>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div class="wind-indicator">
-            <p>Wind: <span id="windSpeed">0</span> mph</p>
-            <p><span id="windDirection">→</span></p>
+        <!-- Player 2 Card -->
+        <div class="player-card right" id="player2Card">
+            <div class="player-avatar player2">🤖</div>
+            <div class="player-name" id="player2Name">Opponent</div>
+            <div class="player-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Lives</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player2Health" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
         </div>
         
-        <div class="controls">
-            <p>Angle: <span id="angleDisplay">45</span>° | Power: <span id="powerDisplay">50</span>%</p>
-            <p>Use ↑↓ for angle, ←→ for power, SPACE to fire</p>
+        <!-- Wind Indicator -->
+        <div class="wind-display">
+            <span class="wind-label">Wind</span>
+            <div class="wind-indicator">
+                <div class="wind-arrow" id="windArrow"></div>
+            </div>
+            <span id="windValue">0 mph</span>
+        </div>
+        
+        <!-- Turn Indicator -->
+        <div class="turn-indicator" id="turnIndicator">
+            <span id="currentPlayer">Player 1</span>'s Turn
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="control-group">
+                <span class="control-label">Angle</span>
+                <span class="control-value" id="angleValue">45°</span>
+                <div class="control-slider">
+                    <div class="slider-fill" id="angleSlider" style="width: 25%"></div>
+                </div>
+            </div>
+            
+            <button class="fire-button" id="fireButton">
+                Fire
+            </button>
+            
+            <div class="control-group">
+                <span class="control-label">Power</span>
+                <span class="control-value" id="powerValue">50%</span>
+                <div class="control-slider">
+                    <div class="slider-fill" id="powerSlider" style="width: 50%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Victory Screen -->
+        <div class="victory-screen" id="victoryScreen">
+            <div class="victory-card">
+                <h1 class="victory-title" id="victoryTitle">Victory!</h1>
+                <p id="victoryMessage">Player 1 Wins!</p>
+                <button class="play-again-btn" id="playAgainBtn">Play Again</button>
+                <button class="play-again-btn" id="backToMenuBtn" style="margin-left: 10px;">Back to Menu</button>
+            </div>
         </div>
     </div>
 </body>

@@ -4,7 +4,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
   mode: 'development',
   entry: {
-    tankGame: './games/tank-game/src/game.js'
+    tankGame: './games/tank-game/src/index.js'
   },
   output: {
     filename: '[name].bundle.js',

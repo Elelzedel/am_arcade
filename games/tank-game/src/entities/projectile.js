@@ -26,19 +26,38 @@ export default class Projectile {
     draw(ctx) {
         ctx.save();
         
-        ctx.strokeStyle = 'rgba(255, 165, 0, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
+        // Glowing trail
         for (let i = 0; i < this.trail.length; i++) {
-            if (i === 0) {
-                ctx.moveTo(this.trail[i].x, this.trail[i].y);
-            } else {
-                ctx.lineTo(this.trail[i].x, this.trail[i].y);
-            }
+            const alpha = (i / this.trail.length) * 0.6;
+            const size = (i / this.trail.length) * this.radius;
+            
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+            ctx.shadowBlur = 10;
+            
+            ctx.beginPath();
+            ctx.arc(this.trail[i].x, this.trail[i].y, size, 0, Math.PI * 2);
+            ctx.fill();
         }
-        ctx.stroke();
         
-        ctx.fillStyle = 'black';
+        // Main projectile with glow
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 20;
+        
+        // Outer glow
+        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 3);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Core
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
