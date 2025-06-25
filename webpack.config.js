@@ -4,7 +4,8 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
   mode: 'development',
   entry: {
-    tankGame: './games/tank-game/src/index.js'
+    tankGame: './games/tank-game/src/index.js',
+    neonRacer: './games/neon-racer/src/index.js'
   },
   output: {
     filename: '[name].bundle.js',
@@ -32,6 +33,10 @@ module.exports = {
       {
         test: /\.css$/,
         use: ['style-loader', 'css-loader']
+      },
+      {
+        test: /\.(glsl|vs|fs|vert|frag)$/,
+        type: 'asset/source'
       }
     ]
   },
@@ -40,6 +45,11 @@ module.exports = {
       filename: 'tank-game.html',
       template: './games/tank-game/index.html',
       chunks: ['tankGame']
+    }),
+    new HtmlWebpackPlugin({
+      filename: 'neon-racer.html',
+      template: './games/neon-racer/index.html',
+      chunks: ['neonRacer']
     })
   ]
 };
