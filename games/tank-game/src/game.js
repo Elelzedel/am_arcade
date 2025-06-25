@@ -14,7 +14,13 @@ class TankGame {
         this.height = this.canvas.height;
         
         this.renderer = new Renderer(this.ctx, this.width, this.height);
-        this.terrain = new Terrain(this.width, this.height);
+        
+        const mapTypes = ['hills', 'jagged', 'valley', 'tower', 'flat', 'bridge'];
+        const randomMapType = mapTypes[Math.floor(Math.random() * mapTypes.length)];
+        this.terrain = new Terrain(this.width, this.height, randomMapType);
+        
+        const largeMaps = ['bridge', 'jagged'];
+        this.scale = largeMaps.includes(randomMapType) ? 0.75 : 1.0;
         
         this.players = [
             new Tank(150, 0, '#ff6b6b', 1),
@@ -144,41 +150,68 @@ class TankGame {
     updateProjectiles(deltaTime) {
         this.projectiles = this.projectiles.filter(projectile => {
             projectile.update(deltaTime, this.wind);
+
+            // 1. Check for tank hits
+            if (this.checkTankHits(projectile.x, projectile.y)) {
+                this.terrain.createCrater(projectile.x, 30); // Crater on hit
+                this.endTurn();
+                return false; // Remove projectile
+            }
             
+            // 2. Check for structure collision
+            if (this.terrain.towerInfo) {
+                const tower = this.terrain.towerInfo;
+                if (projectile.x > tower.x - tower.width / 2 &&
+                    projectile.x < tower.x + tower.width / 2 &&
+                    projectile.y > tower.y &&
+                    projectile.y < tower.y + tower.height) 
+                {
+                    this.terrain.createCrater(projectile.x, 15);
+                    this.endTurn();
+                    return false;
+                }
+            }
+
+            // 3. Check for terrain collision
             const terrainHeight = this.terrain.getHeightAt(projectile.x);
-            
             if (projectile.y >= terrainHeight) {
                 this.terrain.createCrater(projectile.x, 30);
-                this.checkTankHits(projectile.x, projectile.y);
+                this.checkTankHits(projectile.x, projectile.y); // Check for splash damage
                 this.endTurn();
                 return false;
             }
             
+            // 4. Check for out of bounds
             if (projectile.x < 0 || projectile.x > this.width) {
                 this.endTurn();
                 return false;
             }
             
-            return true;
+            return true; // Keep projectile
         });
     }
     
     checkTankHits(x, y) {
+        let hitOccurred = false;
         this.players.forEach(tank => {
-            const distance = Math.sqrt(
-                Math.pow(tank.x - x, 2) + 
-                Math.pow(tank.y - y, 2)
-            );
-            
-            if (distance < 40) {
+            // Rectangle-based collision detection
+            const tankLeft = tank.x - tank.width / 2;
+            const tankRight = tank.x + tank.width / 2;
+            const tankTop = tank.y - tank.height / 2;
+            const tankBottom = tank.y + tank.height / 2;
+
+            // Simple AABB (Axis-Aligned Bounding Box) check
+            if (x >= tankLeft && x <= tankRight && y >= tankTop && y <= tankBottom) {
                 tank.takeDamage();
                 this.updateUI();
+                hitOccurred = true;
                 
                 if (tank.lives <= 0) {
                     this.gameOver(tank.player === 1 ? 2 : 1);
                 }
             }
         });
+        return hitOccurred;
     }
     
     async endTurn() {
@@ -281,13 +314,13 @@ class TankGame {
         this.renderer.drawSky();
         this.terrain.draw(this.ctx);
         
-        this.players.forEach(tank => tank.draw(this.ctx));
+        this.players.forEach(tank => tank.draw(this.ctx, this.scale));
         
         if (this.gameState === 'firing') {
             this.updateProjectiles(deltaTime);
         }
         
-        this.projectiles.forEach(projectile => projectile.draw(this.ctx));
+        this.projectiles.forEach(projectile => projectile.draw(this.ctx, this.scale));
         
         if (this.gameState === 'aiming') {
             this.renderer.drawCurrentPlayerIndicator(this.players[this.currentPlayer]);

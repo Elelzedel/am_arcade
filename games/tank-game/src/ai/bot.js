@@ -11,7 +11,7 @@ export default class TankBot {
             easy: { accuracy: 0.6, thinkingTime: 2000, errorRange: 30 },
             medium: { accuracy: 0.75, thinkingTime: 1500, errorRange: 20 },
             hard: { accuracy: 0.9, thinkingTime: 1000, errorRange: 10 },
-            impossible: { accuracy: 0.98, thinkingTime: 500, errorRange: 3 }
+            impossible: { accuracy: 0.99, thinkingTime: 500, errorRange: 1 }
         };
         
         const settings = difficultySettings[difficulty] || difficultySettings.medium;
@@ -20,87 +20,154 @@ export default class TankBot {
         this.errorRange = settings.errorRange;
     }
     
+    simulateShot(angle, power, wind) {
+        const angleRad = (angle * Math.PI) / 180;
+        const velocity = power * 10;
+
+        let projectile = {
+            x: this.tank.x + Math.cos(angleRad) * this.tank.barrelLength,
+            y: this.tank.y - Math.sin(angleRad) * this.tank.barrelLength,
+            vx: Math.cos(angleRad) * velocity,
+            vy: -Math.sin(angleRad) * velocity,
+        };
+
+        const target = this.opponent;
+        const terrain = this.terrain;
+        const gravity = 300;
+        const windSpeed = wind.speed;
+        const deltaTime = 0.016; // Simulate with a fixed time step, e.g., for 60 FPS
+
+        const maxSteps = 1000; // Max simulation time to prevent infinite loops
+        for (let i = 0; i < maxSteps; i++) {
+            projectile.vx += windSpeed * 2 * deltaTime;
+            projectile.vy += gravity * deltaTime;
+            projectile.x += projectile.vx * deltaTime;
+            projectile.y += projectile.vy * deltaTime;
+
+            // Check for collision with terrain
+            if (projectile.y > terrain.getHeightAt(projectile.x)) {
+                return { hit: 'terrain', x: projectile.x, y: projectile.y };
+            }
+
+            // Check for collision with opponent
+            const dx = projectile.x - target.x;
+            const dy = projectile.y - target.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < target.width / 2) { // A simplified hit check
+                return { hit: 'opponent', x: projectile.x, y: projectile.y };
+            }
+
+            // Check if projectile is out of bounds
+            if (projectile.x < 0 || projectile.x > terrain.width || projectile.y > terrain.height) {
+                return { hit: 'out_of_bounds', x: projectile.x, y: projectile.y };
+            }
+        }
+
+        return { hit: 'timeout', x: projectile.x, y: projectile.y }; // If simulation ends
+    }
+
     calculateOptimalShot(wind) {
-        // Calculate distance and direction to opponent
-        const dx = this.opponent.x - this.tank.x;
-        const dy = this.opponent.y - this.tank.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Determine if we're shooting left or right
-        const shootingLeft = dx < 0;
-        
-        // Calculate the direct angle to target
-        let directAngle = Math.atan2(-dy, Math.abs(dx)) * (180 / Math.PI);
-        
-        // Basic angle calculation with proper arc
-        let optimalAngle;
-        if (shootingLeft) {
-            // Shooting to the left - angles between 90 and 180
-            // We need to add arc to the direct angle
-            optimalAngle = 180 - directAngle - 20; // Start higher for arc
-            
-            // Adjust for distance - closer targets need higher arc
-            if (distance < 300) {
-                optimalAngle += 15;
-            } else if (distance > 600) {
-                optimalAngle -= 10;
+        // For lower difficulties, there's a chance the bot will "mess up"
+        if (Math.random() > this.accuracy) {
+            console.log("Bot is making a deliberately inaccurate shot.");
+            // Return a somewhat random shot based on its current settings
+            const angleError = (Math.random() - 0.5) * 60; // Large random error
+            const powerError = (Math.random() - 0.5) * 40;
+            return {
+                angle: this.tank.angle + angleError,
+                power: this.tank.power + powerError,
+            };
+        }
+
+        const targetX = this.opponent.x;
+        const targetY = this.opponent.y;
+        let bestShot = null;
+        let minDistance = Infinity;
+
+        const shootingLeft = targetX < this.tank.x;
+        const angleStep = 2; // Check angles in steps of 2 degrees
+
+        // We want to iterate from low-arc to high-arc shots to find the fastest path.
+        // Low-arc right: small angle (e.g. 20). High-arc right: large angle (e.g. 70).
+        // Low-arc left: large angle (e.g. 160). High-arc left: small angle (e.g. 110).
+        const startAngle = shootingLeft ? 160 : 20;
+        const endAngle = shootingLeft ? 110 : 70;
+        const step = shootingLeft ? -angleStep : angleStep;
+
+        for (let angle = startAngle; shootingLeft ? angle >= endAngle : angle <= endAngle; angle += step) {
+            // Binary search for power
+            let lowPower = 10;
+            let highPower = 100;
+            let bestPowerForAngle = -1;
+
+            for (let j = 0; j < 10; j++) { // 10 iterations for binary search is enough
+                const midPower = (lowPower + highPower) / 2;
+                if(midPower > 99.5 || midPower < 10.5) break;
+
+                const result = this.simulateShot(angle, midPower, wind);
+
+                if (result.hit === 'opponent') {
+                    bestPowerForAngle = midPower;
+                    break; // Found a direct hit
+                }
+
+                const fellShort = shootingLeft ? (result.x > targetX) : (result.x < targetX);
+
+                if (result.hit === 'terrain') {
+                    if (fellShort) {
+                        lowPower = midPower;
+                    } else {
+                        highPower = midPower;
+                    }
+                } else { // out_of_bounds or timeout
+                    highPower = midPower; // likely overshot
+                }
             }
-        } else {
-            // Shooting to the right - angles between 0 and 90
-            optimalAngle = directAngle + 20; // Add arc
-            
-            // Adjust for distance
-            if (distance < 300) {
-                optimalAngle += 15;
-            } else if (distance > 600) {
-                optimalAngle -= 10;
+
+            let power;
+            if (bestPowerForAngle !== -1) {
+                power = bestPowerForAngle;
+            } else {
+                // if no direct hit was found, lets check the best power we found
+                const lowResult = this.simulateShot(angle, lowPower, wind);
+                const highResult = this.simulateShot(angle, highPower, wind);
+
+                const lowDist = Math.abs(lowResult.x - targetX);
+                const highDist = Math.abs(highResult.x - targetX);
+
+                power = lowDist < highDist ? lowPower : highPower;
+            }
+
+            const result = this.simulateShot(angle, power, wind);
+            const dist = Math.sqrt(Math.pow(result.x - targetX, 2) + Math.pow(result.y - targetY, 2));
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestShot = { angle: angle, power: power, dist: dist };
             }
         }
-        
-        // Calculate power based on distance
-        // More distance = more power needed
-        const maxDistance = this.terrain.width;
-        const distanceRatio = distance / maxDistance;
-        let optimalPower = 40 + (distanceRatio * 40);
-        
-        // Adjust for height difference
-        const heightDiff = this.tank.y - this.opponent.y;
-        if (heightDiff > 0) {
-            // Shooting downward - need less power
-            optimalPower *= 0.9;
-        } else {
-            // Shooting upward - need more power
-            optimalPower *= 1.1;
-            optimalAngle += 5; // Also increase angle slightly
+
+        if (bestShot) {
+            // Add controlled inaccuracy based on difficulty
+            const angleError = (Math.random() - 0.5) * this.errorRange;
+            const powerError = (Math.random() - 0.5) * this.errorRange * 0.5; // less error on power
+            bestShot.angle += angleError;
+            bestShot.power += powerError;
+
+            // Clamp values
+            bestShot.angle = Math.max(0, Math.min(180, bestShot.angle));
+            bestShot.power = Math.max(10, Math.min(100, bestShot.power));
+
+            return {
+                angle: Math.round(bestShot.angle),
+                power: Math.round(bestShot.power)
+            };
         }
-        
-        // Adjust for wind
-        const windEffect = wind.speed * wind.direction * 0.3;
-        if (shootingLeft && wind.direction > 0) {
-            // Wind is against us
-            optimalPower += Math.abs(windEffect);
-        } else if (!shootingLeft && wind.direction < 0) {
-            // Wind is against us
-            optimalPower += Math.abs(windEffect);
-        } else {
-            // Wind is with us
-            optimalPower -= Math.abs(windEffect) * 0.5;
-        }
-        
-        // Add controlled inaccuracy based on difficulty
-        const angleError = (Math.random() - 0.5) * this.errorRange;
-        const powerError = (Math.random() - 0.5) * this.errorRange;
-        
-        optimalAngle += angleError;
-        optimalPower += powerError;
-        
-        // Clamp values
-        optimalAngle = Math.max(0, Math.min(180, optimalAngle));
-        optimalPower = Math.max(10, Math.min(100, optimalPower));
-        
+
+        // Fallback to a random shot if no solution found (should be rare)
+        console.error("Bot could not find a solution. Firing a random shot.");
         return {
-            angle: Math.round(optimalAngle),
-            power: Math.round(optimalPower)
+            angle: Math.random() * 180,
+            power: Math.random() * 50 + 20
         };
     }
     

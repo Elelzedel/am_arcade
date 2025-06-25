@@ -12,7 +12,7 @@ export default class Renderer {
         for (let i = 0; i < 100; i++) {
             stars.push({
                 x: Math.random() * this.width,
-                y: Math.random() * this.height * 0.6,
+                y: Math.random() * this.height,
                 size: Math.random() * 2,
                 brightness: Math.random()
             });
@@ -55,13 +55,13 @@ export default class Renderer {
         this.ctx.save();
         
         // Aurora gradient
-        const gradient = this.ctx.createLinearGradient(0, 0, this.width, this.height * 0.5);
+        const gradient = this.ctx.createLinearGradient(0, 0, this.width, this.height);
         gradient.addColorStop(0, 'rgba(90, 200, 250, 0.05)');
         gradient.addColorStop(0.5, 'rgba(138, 43, 226, 0.05)');
         gradient.addColorStop(1, 'rgba(255, 107, 107, 0.05)');
         
         this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(0, 0, this.width, this.height * 0.7);
+        this.ctx.fillRect(0, 0, this.width, this.height);
         
         this.ctx.restore();
     }

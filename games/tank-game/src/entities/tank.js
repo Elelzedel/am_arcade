@@ -43,19 +43,23 @@ export default class Tank {
         this.lives--;
     }
     
-    draw(ctx) {
+    draw(ctx, scale = 1) {
         ctx.save();
+        
+        const scaledWidth = this.width * scale;
+        const scaledHeight = this.height * scale;
+        const scaledBarrel = this.barrelLength * scale;
         
         // Add glow effect
         ctx.shadowColor = this.player === 1 ? '#ff6b6b' : '#5ac8fa';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 20 * scale;
         
         // Modern gradient for tank body
         const bodyGradient = ctx.createLinearGradient(
-            this.x - this.width/2, 
-            this.y - this.height/2,
-            this.x + this.width/2, 
-            this.y + this.height/2
+            this.x - scaledWidth / 2, 
+            this.y - scaledHeight / 2,
+            this.x + scaledWidth / 2, 
+            this.y + scaledHeight / 2
         );
         
         if (this.player === 1) {
@@ -66,34 +70,51 @@ export default class Tank {
             bodyGradient.addColorStop(1, '#3498db');
         }
         
-        // Tank base with rounded corners
         ctx.fillStyle = bodyGradient;
+
+        // Tank Body - a more detailed shape
+        const bodyW = scaledWidth / 2;
+        const bodyH = scaledHeight / 2;
+        
         ctx.beginPath();
-        const radius = 5;
-        ctx.moveTo(this.x - this.width/2 + radius, this.y - this.height/2);
-        ctx.lineTo(this.x + this.width/2 - radius, this.y - this.height/2);
-        ctx.quadraticCurveTo(this.x + this.width/2, this.y - this.height/2, this.x + this.width/2, this.y - this.height/2 + radius);
-        ctx.lineTo(this.x + this.width/2, this.y + this.height/2 - radius);
-        ctx.quadraticCurveTo(this.x + this.width/2, this.y + this.height/2, this.x + this.width/2 - radius, this.y + this.height/2);
-        ctx.lineTo(this.x - this.width/2 + radius, this.y + this.height/2);
-        ctx.quadraticCurveTo(this.x - this.width/2, this.y + this.height/2, this.x - this.width/2, this.y + this.height/2 - radius);
-        ctx.lineTo(this.x - this.width/2, this.y - this.height/2 + radius);
-        ctx.quadraticCurveTo(this.x - this.width/2, this.y - this.height/2, this.x - this.width/2 + radius, this.y - this.height/2);
+        ctx.moveTo(this.x - bodyW, this.y - bodyH * 0.4);
+        ctx.lineTo(this.x - bodyW + 4 * scale, this.y - bodyH);
+        ctx.lineTo(this.x + bodyW - 4 * scale, this.y - bodyH);
+        ctx.lineTo(this.x + bodyW, this.y - bodyH * 0.4);
+        ctx.lineTo(this.x + bodyW, this.y + bodyH * 0.6);
+        ctx.lineTo(this.x + bodyW - 8 * scale, this.y + bodyH);
+        ctx.lineTo(this.x - bodyW + 8 * scale, this.y + bodyH);
+        ctx.lineTo(this.x - bodyW, this.y + bodyH * 0.6);
         ctx.closePath();
         ctx.fill();
-        
-        // Tank turret
+
+        // Wheels
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.shadowBlur = 0;
+        const wheelRadius = 4 * scale;
+        const wheelY = this.y + bodyH * 0.5;
+        ctx.beginPath(); ctx.arc(this.x - bodyW/2, wheelY, wheelRadius, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, wheelY, wheelRadius, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x + bodyW/2, wheelY, wheelRadius, 0, 2*Math.PI); ctx.fill();
+        ctx.shadowBlur = 20 * scale;
+
+        // Tank turret - semi-circle
+        const turretRadius = 15 * scale;
+        const turretY = this.y - bodyH;
+        ctx.fillStyle = bodyGradient;
         ctx.beginPath();
-        ctx.arc(this.x, this.y - this.height/2, 15, 0, Math.PI * 2);
+        ctx.arc(this.x, turretY + turretRadius -1 * scale, turretRadius, Math.PI, 0);
+        ctx.closePath();
         ctx.fill();
         
         // Modern barrel with gradient
         const angleRad = (this.angle * Math.PI) / 180;
-        const barrelEndX = this.x + Math.cos(angleRad) * this.barrelLength;
-        const barrelEndY = this.y - this.height/2 - Math.sin(angleRad) * this.barrelLength;
+        const barrelStartY = turretY + 4 * scale;
+        const barrelEndX = this.x + Math.cos(angleRad) * scaledBarrel;
+        const barrelEndY = barrelStartY - Math.sin(angleRad) * scaledBarrel;
         
         const barrelGradient = ctx.createLinearGradient(
-            this.x, this.y - this.height/2,
+            this.x, barrelStartY,
             barrelEndX, barrelEndY
         );
         
@@ -106,10 +127,10 @@ export default class Tank {
         }
         
         ctx.strokeStyle = barrelGradient;
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 6 * scale;
         ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y - this.height/2);
+        ctx.moveTo(this.x, barrelStartY);
         ctx.lineTo(barrelEndX, barrelEndY);
         ctx.stroke();
         
@@ -118,9 +139,9 @@ export default class Tank {
         
         // Modern player indicator
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = `bold ${10 * scale}px -apple-system, BlinkMacSystemFont, sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText(`P${this.player}`, this.x, this.y + 25);
+        ctx.fillText(`P${this.player}`, this.x, this.y + 25 * scale);
         
         ctx.restore();
     }
