@@ -1,0 +1,478 @@
+/* Import font stack - removed external font import to avoid loading issues */
+
+/* Root variables following AM Arcade style guide */
+:root {
+    --primary-gradient: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+    --secondary-gradient: linear-gradient(135deg, #2d1b69 0%, #1a1a3e 100%);
+    --accent-blue: #5ac8fa;
+    --accent-orange: #ff6b6b;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --blur-amount: 20px;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+}
+
+/* Base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    background: var(--primary-gradient);
+    background-attachment: fixed;
+    color: var(--text-primary);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+}
+
+/* Glass card component */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-amount));
+    -webkit-backdrop-filter: blur(var(--blur-amount));
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 32px var(--shadow-color);
+    transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px var(--shadow-color);
+}
+
+/* Button styles */
+.button-primary {
+    background: linear-gradient(135deg, var(--accent-orange), #ff8787);
+    border: none;
+    border-radius: 16px;
+    padding: 16px 32px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 14px;
+}
+
+.button-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 107, 107, 0.3);
+}
+
+.button-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-amount));
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 16px 32px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 14px;
+}
+
+.button-glass:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--shadow-color);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient text */
+.gradient-text {
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-orange));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Menu screen */
+.menu-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #0a0a1e;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+    z-index: 100;
+}
+
+.menu-container {
+    text-align: center;
+    animation: fadeIn 0.6s ease-out;
+}
+
+.menu-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, monospace;
+    font-size: 64px;
+    font-weight: 900;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+}
+
+.menu-subtitle {
+    font-size: 20px;
+    color: var(--text-secondary);
+    margin-bottom: 50px;
+    letter-spacing: 2px;
+}
+
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.menu-button {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-amount));
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+}
+
+.menu-button:hover {
+    transform: translateX(10px);
+    box-shadow: 0 8px 32px var(--shadow-color);
+    border-color: var(--accent-blue);
+}
+
+.menu-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.menu-button:disabled:hover {
+    transform: none;
+}
+
+.button-icon {
+    font-size: 32px;
+    width: 50px;
+    text-align: center;
+}
+
+.button-content h3 {
+    font-size: 20px;
+    margin-bottom: 5px;
+    color: var(--text-primary);
+}
+
+.button-content p {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* Game container */
+#gameContainer {
+    position: relative;
+    width: 1024px;
+    height: 576px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+#gameCanvas {
+    display: block;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* HUD */
+.hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.hud-element {
+    position: absolute;
+    pointer-events: auto;
+}
+
+/* Speed indicator */
+.speed-indicator {
+    top: 20px;
+    left: 20px;
+    min-width: 200px;
+}
+
+.speed-indicator label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.speed-value {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, monospace;
+    font-size: 36px;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.speed-value .unit {
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.speed-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin-top: 12px;
+    overflow: hidden;
+}
+
+.speed-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), #6dd5ff);
+    border-radius: 4px;
+    transition: width 0.3s ease, background 0.3s ease;
+    width: 0%;
+}
+
+/* Score display */
+.score-display {
+    top: 20px;
+    right: 20px;
+    min-width: 150px;
+    text-align: right;
+}
+
+.score-display label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.score-value {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, monospace;
+    font-size: 32px;
+    font-weight: 700;
+}
+
+/* Distance display */
+.distance-display {
+    bottom: 20px;
+    left: 20px;
+    min-width: 150px;
+}
+
+.distance-display label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.distance-value {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, monospace;
+    font-size: 24px;
+    font-weight: 600;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.distance-value .unit {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* Power-up display */
+.powerup-display {
+    bottom: 20px;
+    right: 20px;
+    min-width: 80px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.powerup-icon {
+    font-size: 32px;
+}
+
+.powerup-timer {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, monospace;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* Pause screen */
+.pause-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+}
+
+.pause-container {
+    text-align: center;
+    min-width: 300px;
+    animation: slideIn 0.3s ease-out;
+}
+
+.pause-container h2 {
+    font-size: 48px;
+    margin-bottom: 30px;
+}
+
+.pause-container button {
+    display: block;
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+/* Game over screen */
+.game-over-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+}
+
+.game-over-container {
+    text-align: center;
+    min-width: 400px;
+    animation: slideIn 0.5s ease-out;
+}
+
+.game-over-container h2 {
+    font-size: 56px;
+    margin-bottom: 40px;
+}
+
+.final-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.stat-item label {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, monospace;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.game-over-container button {
+    margin: 10px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    #gameContainer {
+        transform: scale(0.9);
+    }
+}
+
+@media (max-width: 1024px) {
+    #gameContainer {
+        transform: scale(0.8);
+    }
+}

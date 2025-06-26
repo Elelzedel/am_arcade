@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank Artillery - Modern Edition</title>
+</head>
+<body>
+    <!-- Main Menu -->
+    <div id="mainMenu" class="menu-screen">
+        <div class="menu-container">
+            <h1 class="menu-title">Tank Artillery</h1>
+            <p class="menu-subtitle">Choose your battle mode</p>
+            
+            <div class="menu-options">
+                <button class="menu-button" id="multiplayerBtn" disabled>
+                    <div class="button-icon">🌐</div>
+                    <div class="button-content">
+                        <h3>Multiplayer</h3>
+                        <p>Battle online opponents</p>
+                        <span class="coming-soon">Coming Soon</span>
+                    </div>
+                </button>
+                
+                <button class="menu-button" id="singleplayerBtn">
+                    <div class="button-icon">🤖</div>
+                    <div class="button-content">
+                        <h3>Single Player</h3>
+                        <p>Challenge the AI</p>
+                    </div>
+                </button>
+                
+                <button class="menu-button" id="selfplayBtn">
+                    <div class="button-icon">🎮</div>
+                    <div class="button-content">
+                        <h3>Self Play</h3>
+                        <p>Control both tanks</p>
+                    </div>
+                </button>
+            </div>
+            
+            <!-- Difficulty Selector -->
+            <div class="difficulty-selector" id="difficultySelector" style="display: none;">
+                <h3 class="difficulty-title">Select Difficulty</h3>
+                <div class="difficulty-options">
+                    <button class="difficulty-button" data-difficulty="easy">
+                        <span class="difficulty-icon">🌱</span>
+                        <span>Easy</span>
+                    </button>
+                    <button class="difficulty-button" data-difficulty="medium">
+                        <span class="difficulty-icon">⚔️</span>
+                        <span>Medium</span>
+                    </button>
+                    <button class="difficulty-button" data-difficulty="hard">
+                        <span class="difficulty-icon">🔥</span>
+                        <span>Hard</span>
+                    </button>
+                    <button class="difficulty-button" data-difficulty="impossible">
+                        <span class="difficulty-icon">💀</span>
+                        <span>Impossible</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="gameContainer" style="display: none;">
+        <canvas id="gameCanvas" width="1024" height="576"></canvas>
+        
+        <!-- Player 1 Card -->
+        <div class="player-card left" id="player1Card">
+            <div class="player-avatar player1">🎮</div>
+            <div class="player-name">You</div>
+            <div class="player-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Lives</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player1Health" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Player 2 Card -->
+        <div class="player-card right" id="player2Card">
+            <div class="player-avatar player2">🤖</div>
+            <div class="player-name" id="player2Name">Opponent</div>
+            <div class="player-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Lives</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player2Health" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Wind Indicator -->
+        <div class="wind-display">
+            <span class="wind-label">Wind</span>
+            <div class="wind-indicator">
+                <div class="wind-arrow" id="windArrow"></div>
+            </div>
+            <span id="windValue">0 mph</span>
+        </div>
+        
+        <!-- Turn Indicator -->
+        <div class="turn-indicator" id="turnIndicator">
+            <span id="currentPlayer">Player 1</span>'s Turn
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="control-group">
+                <span class="control-label">Angle</span>
+                <span class="control-value" id="angleValue">45°</span>
+                <div class="control-slider">
+                    <div class="slider-fill" id="angleSlider" style="width: 25%"></div>
+                </div>
+            </div>
+            
+            <button class="fire-button" id="fireButton">
+                Fire
+            </button>
+            
+            <div class="control-group">
+                <span class="control-label">Power</span>
+                <span class="control-value" id="powerValue">50%</span>
+                <div class="control-slider">
+                    <div class="slider-fill" id="powerSlider" style="width: 50%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Victory Screen -->
+        <div class="victory-screen" id="victoryScreen">
+            <div class="victory-card">
+                <h1 class="victory-title" id="victoryTitle">Victory!</h1>
+                <p id="victoryMessage">Player 1 Wins!</p>
+                <button class="play-again-btn" id="playAgainBtn">Play Again</button>
+                <button class="play-again-btn" id="backToMenuBtn" style="margin-left: 10px;">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

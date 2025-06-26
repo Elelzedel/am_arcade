@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import cabinetModelFile from './../static/cabinet/model.gltf'
 
-import Cabinet from '/src/cabinet.js'
+import Cabinet from './cabinet.js'
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0x111111 );
@@ -25,7 +26,7 @@ let cabinets = [];
 cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF"));
 cabinets.push(new Cabinet(1, "Neon Rancer", "#00FFFF"));
 
-loader.load( 'static/cabinet/model.gltf', function ( cabinetModel ) {
+loader.load(cabinetModelFile, function ( cabinetModel ) {
 	cabinetModel = cabinetModel.scene.children[0] 
 	for (const cabinet of cabinets) {
 		cabinet.addToScene(scene, cabinetModel.clone());

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Racer - AM Arcade</title>
+</head>
+<body>
+    <div id="mainMenu" class="menu-screen">
+        <div class="menu-container">
+            <h1 class="menu-title gradient-text">Neon Racer</h1>
+            <p class="menu-subtitle">Race through endless neon tunnels</p>
+            <div class="menu-options">
+                <button id="startGameBtn" class="menu-button">
+                    <div class="button-icon">🚀</div>
+                    <div class="button-content">
+                        <h3>Start Game</h3>
+                        <p>Begin your neon journey</p>
+                    </div>
+                </button>
+                <button id="highScoresBtn" class="menu-button">
+                    <div class="button-icon">🏆</div>
+                    <div class="button-content">
+                        <h3>High Scores</h3>
+                        <p>View the leaderboard</p>
+                    </div>
+                </button>
+                <button id="settingsBtn" class="menu-button">
+                    <div class="button-icon">⚙️</div>
+                    <div class="button-content">
+                        <h3>Settings</h3>
+                        <p>Configure controls & graphics</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameContainer" style="display: none;">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD Elements -->
+        <div class="hud">
+            <!-- Speed Indicator -->
+            <div class="hud-element speed-indicator glass-card">
+                <label>Speed</label>
+                <div class="speed-value">
+                    <span id="speedValue">0</span>
+                    <span class="unit">km/h</span>
+                </div>
+                <div class="speed-bar">
+                    <div id="speedBar" class="speed-fill"></div>
+                </div>
+            </div>
+
+            <!-- Score Display -->
+            <div class="hud-element score-display glass-card">
+                <label>Score</label>
+                <div id="scoreValue" class="score-value">0</div>
+            </div>
+
+            <!-- Distance Display -->
+            <div class="hud-element distance-display glass-card">
+                <label>Distance</label>
+                <div class="distance-value">
+                    <span id="distanceValue">0</span>
+                    <span class="unit">m</span>
+                </div>
+            </div>
+
+            <!-- Power-up Status -->
+            <div class="hud-element powerup-display glass-card" id="powerupDisplay" style="display: none;">
+                <div id="powerupIcon" class="powerup-icon"></div>
+                <div id="powerupTimer" class="powerup-timer"></div>
+            </div>
+        </div>
+
+        <!-- Pause Menu -->
+        <div id="pauseMenu" class="pause-screen" style="display: none;">
+            <div class="pause-container glass-card">
+                <h2 class="gradient-text">Paused</h2>
+                <button id="resumeBtn" class="button-primary">Resume</button>
+                <button id="restartBtn" class="button-glass">Restart</button>
+                <button id="quitBtn" class="button-glass">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="game-over-screen" style="display: none;">
+            <div class="game-over-container glass-card">
+                <h2 class="gradient-text">Game Over</h2>
+                <div class="final-stats">
+                    <div class="stat-item">
+                        <label>Final Score</label>
+                        <div id="finalScore" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Distance Traveled</label>
+                        <div id="finalDistance" class="stat-value">0m</div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Max Speed</label>
+                        <div id="finalSpeed" class="stat-value">0 km/h</div>
+                    </div>
+                </div>
+                <button id="playAgainBtn" class="button-primary">Play Again</button>
+                <button id="mainMenuBtn" class="button-glass">Main Menu</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
