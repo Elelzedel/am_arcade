@@ -1,9 +1,27 @@
 import * as THREE from 'three';
 
+// Helper function to create procedural asteroid geometry
+function createAsteroidGeometry(radius, detail) {
+    const geometry = new THREE.IcosahedronGeometry(radius, detail);
+    const positionAttribute = geometry.getAttribute('position');
+    
+    for (let i = 0; i < positionAttribute.count; i++) {
+        const vertex = new THREE.Vector3();
+        vertex.fromBufferAttribute(positionAttribute, i);
+        
+        const displacement = Math.random() * (radius * 0.5);
+        vertex.normalize().multiplyScalar(radius + displacement);
+        
+        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+    
+    geometry.computeVertexNormals();
+    return geometry;
+}
+
 // Shared materials to reduce memory usage
 const sharedMaterials = {
-    obstacle: null,
-    warning: null
+    asteroid: null
 };
 
 class Obstacle {
@@ -14,13 +32,11 @@ class Obstacle {
         this.group.position.copy(position);
         
         // Initialize shared materials once
-        if (!sharedMaterials.obstacle) {
-            sharedMaterials.obstacle = new THREE.MeshBasicMaterial({
-                color: 0xff4444
-            });
-            
-            sharedMaterials.warning = new THREE.MeshBasicMaterial({
-                color: 0xff0000
+        if (!sharedMaterials.asteroid) {
+            sharedMaterials.asteroid = new THREE.MeshStandardMaterial({
+                color: 0x999999, // Rock grey
+                roughness: 0.8,
+                metalness: 0.2
             });
         }
         
@@ -29,141 +45,118 @@ class Obstacle {
     }
     
     createObstacle() {
-        const material = sharedMaterials.obstacle;
-        
         switch(this.type) {
             case 'barrier':
-                this.createBarrier(material);
+                this.createAsteroidField();
                 break;
             case 'rotating':
-                this.createRotatingObstacle(material);
+                this.createRotatingAsteroid();
                 break;
             case 'moving':
-                this.createMovingObstacle(material);
+                this.createOrbitingAsteroids();
                 break;
             default:
-                this.createBarrier(material);
+                this.createAsteroidField();
         }
     }
     
-    createBarrier(material) {
-        // Create a wall segment with a gap
-        const wallHeight = 10;
-        const wallWidth = 2;
-        const gapSize = 8;
-        
-        // Random gap position
-        const gapPosition = (Math.random() - 0.5) * 20;
-        
-        // Left wall
-        const leftWallGeometry = new THREE.BoxGeometry(wallWidth, wallHeight * 2, 2);
-        const leftWall = new THREE.Mesh(leftWallGeometry, material);
-        leftWall.position.x = gapPosition - gapSize / 2 - wallHeight;
-        this.group.add(leftWall);
-        
-        // Right wall
-        const rightWallGeometry = new THREE.BoxGeometry(wallWidth, wallHeight * 2, 2);
-        const rightWall = new THREE.Mesh(rightWallGeometry, material);
-        rightWall.position.x = gapPosition + gapSize / 2 + wallHeight;
-        this.group.add(rightWall);
-        
-        // Top wall
-        const topWallGeometry = new THREE.BoxGeometry(40, wallWidth, 2);
-        const topWall = new THREE.Mesh(topWallGeometry, material);
-        topWall.position.y = 15;
-        this.group.add(topWall);
-        
-        // Bottom wall
-        const bottomWallGeometry = new THREE.BoxGeometry(40, wallWidth, 2);
-        const bottomWall = new THREE.Mesh(bottomWallGeometry, material);
-        bottomWall.position.y = -15;
-        this.group.add(bottomWall);
-        
-        // Add warning lights
-        this.addWarningLights();
+    createAsteroidField() {
+        const material = sharedMaterials.asteroid;
+        const numAsteroids = 12 + Math.floor(Math.random() * 8);
+        const fieldRadius = 25;
+        const gapSize = 9; // Player needs about 8 units of space
+
+        for (let i = 0; i < numAsteroids; i++) {
+            const size = 1.5 + Math.random() * 2;
+            const asteroidGeometry = createAsteroidGeometry(size, 1);
+            const asteroid = new THREE.Mesh(asteroidGeometry, material);
+
+            const angle = Math.random() * Math.PI * 2;
+            const radius = gapSize + Math.random() * (fieldRadius - gapSize);
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+
+            asteroid.position.set(x, y, (Math.random() - 0.5) * 20);
+            asteroid.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            this.group.add(asteroid);
+        }
     }
     
-    createRotatingObstacle(material) {
-        // Create spinning blades with gaps
-        const bladeCount = 3; // Reduced from 4
-        const bladeLength = 12; // Reduced from 15
-        const bladeWidth = 1.5; // Reduced from 2
+    createRotatingAsteroid() {
+        const material = sharedMaterials.asteroid;
+        const asteroidSize = 4 + Math.random() * 2; // Reduced from 5-8 to 4-6
+        const asteroidGeometry = createAsteroidGeometry(asteroidSize, 2);
+        const asteroid = new THREE.Mesh(asteroidGeometry, material);
+        this.group.add(asteroid);
         
-        for (let i = 0; i < bladeCount; i++) {
-            const angle = (i / bladeCount) * Math.PI * 2;
-            const bladeGeometry = new THREE.BoxGeometry(bladeLength, bladeWidth, 2);
-            const blade = new THREE.Mesh(bladeGeometry, material);
+        this.rotationSpeed = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.4,
+            (Math.random() - 0.5) * 0.4,
+            (Math.random() - 0.5) * 0.4
+        );
+    }
+    
+    createOrbitingAsteroids() {
+        const material = sharedMaterials.asteroid;
+        const numAsteroids = 3;
+        
+        for (let i = 0; i < numAsteroids; i++) {
+            const size = 2 + Math.random() * 1.5;
+            const asteroidGeometry = createAsteroidGeometry(size, 1);
+            const asteroid = new THREE.Mesh(asteroidGeometry, material);
             
-            blade.rotation.z = angle;
-            this.group.add(blade);
+            const angle = (i / numAsteroids) * Math.PI * 2 + Math.random() * 0.5;
+            const radius = 8 + Math.random() * 4;
+            
+            asteroid.userData.angle = angle;
+            asteroid.userData.radius = radius;
+            asteroid.userData.rotationSpeed = new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2
+            );
+            
+            this.group.add(asteroid);
         }
         
-        // Smaller center hub with fewer segments
-        const hubGeometry = new THREE.CylinderGeometry(1, 1, 3, 6);
-        hubGeometry.rotateX(Math.PI / 2);
-        const hub = new THREE.Mesh(hubGeometry, material);
-        this.group.add(hub);
-        
-        // Much slower rotation
-        this.rotationSpeed = 0.5 + Math.random() * 0.5; // Reduced from 1-3 to 0.5-1
-    }
-    
-    createMovingObstacle(material) {
-        // Create moving blocks
-        const blockSize = 4;
-        const blockGeometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
-        
-        // Create multiple blocks
-        for (let i = 0; i < 3; i++) {
-            const block = new THREE.Mesh(blockGeometry, material);
-            const angle = (i / 3) * Math.PI * 2;
-            block.userData.angle = angle;
-            block.userData.radius = 10;
-            this.group.add(block);
-        }
-        
-        this.moveSpeed = 2;
-    }
-    
-    addWarningLights() {
-        // Add simple warning lights without point lights for performance
-        const lightGeometry = new THREE.SphereGeometry(0.3, 6, 6);
-        const lightMaterial = sharedMaterials.warning;
-        
-        const positions = [
-            { x: -10, y: 15 },
-            { x: 10, y: 15 },
-            { x: -10, y: -15 },
-            { x: 10, y: -15 }
-        ];
-        
-        positions.forEach(pos => {
-            const light = new THREE.Mesh(lightGeometry, lightMaterial);
-            light.position.set(pos.x, pos.y, 0);
-            this.group.add(light);
-        });
+        this.moveSpeed = 1 + Math.random() * 0.5;
     }
     
     update(deltaTime) {
-        if (this.type === 'rotating' && this.rotationSpeed) {
-            this.group.rotation.z += this.rotationSpeed * deltaTime;
+        if (this.type === 'rotating') {
+            if (this.rotationSpeed) {
+                this.group.rotation.x += this.rotationSpeed.x * deltaTime;
+                this.group.rotation.y += this.rotationSpeed.y * deltaTime;
+                this.group.rotation.z += this.rotationSpeed.z * deltaTime;
+            }
         }
         
-        if (this.type === 'moving' && this.moveSpeed) {
-            this.group.children.forEach(child => {
-                if (child.userData.angle !== undefined) {
-                    child.userData.angle += this.moveSpeed * deltaTime;
-                    child.position.x = Math.cos(child.userData.angle) * child.userData.radius;
-                    child.position.y = Math.sin(child.userData.angle) * child.userData.radius;
-                }
-            });
+        if (this.type === 'moving') {
+            if (this.moveSpeed) {
+                this.group.children.forEach(child => {
+                    if (child.userData.angle !== undefined) {
+                        // Orbiting motion
+                        child.userData.angle += this.moveSpeed * deltaTime;
+                        child.position.x = Math.cos(child.userData.angle) * child.userData.radius;
+                        child.position.y = Math.sin(child.userData.angle) * child.userData.radius;
+                        
+                        // Individual rotation
+                        child.rotation.x += child.userData.rotationSpeed.x * deltaTime;
+                        child.rotation.y += child.userData.rotationSpeed.y * deltaTime;
+                        child.rotation.z += child.userData.rotationSpeed.z * deltaTime;
+                    }
+                });
+            }
         }
     }
     
     dispose() {
         this.group.traverse(child => {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) child.material.dispose();
+            if (child.isMesh) {
+                if (child.geometry) {
+                    child.geometry.dispose();
+                }
+            }
         });
         this.scene.remove(this.group);
     }

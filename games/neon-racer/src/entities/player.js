@@ -9,7 +9,7 @@ class Player {
         
         // Movement parameters
         this.moveSpeed = 8; // Reduced from 15 for finer control
-        this.maxOffset = 15; // Maximum distance from center
+        this.maxOffset = 13; // Maximum distance from center (reduced from 15)
         this.tiltAmount = 0.3; // Banking angle when turning
         this.acceleration = 0.5; // How quickly we reach max speed
         this.deceleration = 0.85; // How quickly we stop (lower = faster stop)

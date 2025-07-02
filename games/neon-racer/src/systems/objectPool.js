@@ -43,12 +43,6 @@ class ObjectPool {
     }
     
     returnObstacle(obstacle) {
-        // Remove from active list
-        const index = this.activeObstacles.indexOf(obstacle);
-        if (index > -1) {
-            this.activeObstacles.splice(index, 1);
-        }
-        
         // Reset and return to pool
         obstacle.group.visible = false;
         obstacle.group.position.set(0, 0, -1000);
@@ -60,18 +54,22 @@ class ObjectPool {
     }
     
     update(deltaTime, speed) {
+        const remainingObstacles = [];
+
         // Update all active obstacles
-        this.activeObstacles = this.activeObstacles.filter(obstacle => {
+        for (const obstacle of this.activeObstacles) {
             obstacle.group.position.z += speed * deltaTime;
             obstacle.update(deltaTime);
-            
+
             // Return to pool if passed
             if (obstacle.group.position.z > 10) {
                 this.returnObstacle(obstacle);
-                return false;
+            } else {
+                remainingObstacles.push(obstacle);
             }
-            return true;
-        });
+        }
+
+        this.activeObstacles = remainingObstacles;
     }
     
     reset() {
