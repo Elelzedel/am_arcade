@@ -28,6 +28,8 @@ let cabinets = [];
 
 //cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF"));
 cabinets.push(new Cabinet(0, "Neon Rancer", "#00FFFF", "neon-racer/src/game"));
+cabinets.push(new Cabinet(1, "Placeholder 1", "#00FF00", "neon-racer/src/game"));
+cabinets.push(new Cabinet(2, "Placeholder 2", "#FF0000", "neon-racer/src/game"));
 
 const pressedKeys = new Set();
 
@@ -42,7 +44,7 @@ document.addEventListener('keyup', (event) => {
 loader.load(cabinetModelFile, async function ( cabinetModel ) {
 	cabinetModel = cabinetModel.scene.children[0] 
 	for (const cabinet of cabinets) {
-		await cabinet.addToScene(scene, cabinetModel.clone());
+		await cabinet.addToScene(scene, cabinetModel);
 	}
 
 	renderer.setAnimationLoop( animate );

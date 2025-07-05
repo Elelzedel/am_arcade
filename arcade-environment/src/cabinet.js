@@ -7,17 +7,18 @@ export default class Cabinet {
 		this.color = color;
 		this.gamePath = gamePath;
 		this.starting = false;
+
+		this.offsetZ = place * -3;
 	}
 
-	async addToScene(scene, model) {
-		this.addCabinetModel(scene, model);
+	async addToScene(scene, baseModel) {
+		this.addCabinetModel(scene, baseModel);
 
 		let subCanvas = document.createElement('canvas');
 		subCanvas.width = 1024;
 		subCanvas.height = 576;
 
 		const screenGeometry = new THREE.PlaneGeometry( 0.7, 0.6 );
-		console.log("Adding to scene");
 
 		this.subCanvasTexture = new THREE.CanvasTexture(subCanvas);
 		this.subCanvasMaterial = new THREE.MeshBasicMaterial({map: this.subCanvasTexture})
@@ -29,7 +30,7 @@ export default class Cabinet {
 
 		this.screen.position.x = -4.21;
 		this.screen.position.y = 1.35;
-		this.screen.position.z = this.place * -3;
+		this.screen.position.z = this.offsetZ;
 
 
 		scene.add( this.screen );
@@ -43,6 +44,13 @@ export default class Cabinet {
 		this.subCanvasTexture.needsUpdate = true;
 
 		if (this.starting == false && startKeyPressed) {
+			if (
+				camera.threeCamera.position.z < this.offsetZ - 1 || 
+				camera.threeCamera.position.z > this.offsetZ + 1 
+			) {
+				return;
+			}
+
 			this.starting = true;
 			camera.setRubberBand(-2.7, this.place * -3, Math.PI/2);
 			camera.locked = true;
@@ -52,13 +60,9 @@ export default class Cabinet {
 		}
 	}
 
-	async addCabinetModel(scene, model) {
-		model.rotation.y = -Math.PI/2;
-		model.position.x = -5;
-		model.position.z = this.place * -3;
-		console.log(model.position.z)
+	async addCabinetModel(scene, baseModel) {
 
-		let image = model.material.map.image;
+		let image = baseModel.material.map.image;
 
 		const colSwapCanvas = document.createElement('canvas');
 		const colSwapCanvasCtx = colSwapCanvas.getContext('2d');
@@ -70,28 +74,35 @@ export default class Cabinet {
 		let imageData = colSwapCanvasCtx.getImageData(0, 0, colSwapCanvas.width, colSwapCanvas.height);
 
 		let colorReg = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(this.color);
+		console.log(colorReg);
 
 		for (let i = 0; i < imageData.data.length; i += 4) {
 			console.log(imageData.data[i]);
 			// Swap magenta
 			if (imageData.data[i] === 255 && imageData.data[i + 2] === 255) {
-				imageData.data[i] = parseInt(colorReg[0], 16);
-				imageData.data[i + 1] = parseInt(colorReg[1], 16);
-				imageData.data[i + 2] = parseInt(colorReg[2], 16);
+				imageData.data[i] = parseInt(colorReg[1], 16);
+				imageData.data[i + 1] = parseInt(colorReg[2], 16);
+				imageData.data[i + 2] = parseInt(colorReg[3], 16);
 			}
 		}
 		colSwapCanvasCtx.putImageData(imageData, 0, 0);
-
-		model.material.map.image = await createImageBitmap(colSwapCanvas);
 
 		const texture = new THREE.CanvasTexture(colSwapCanvas);
 		texture.minFilter = THREE.NearestFilter;
 		texture.magFilter = THREE.NearestFilter;
 
 		const material = new THREE.MeshLambertMaterial({map: texture})
-		model.material = material;
+
+		let geometry = baseModel.geometry.clone();
+		geometry.applyMatrix4(baseModel.matrixWorld);
+
+		let model = new THREE.Mesh(geometry, material);
 
 		model.needsUpdate = true;
+
+		model.rotation.y = -Math.PI/2;
+		model.position.x = -5;
+		model.position.z = this.offsetZ;
 
 		scene.add(model);
 	}
