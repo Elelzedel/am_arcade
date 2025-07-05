@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import cabinetModelFile from './../static/cabinet/model.gltf'
 
+window.arcadeMode = true;
+
 import Cabinet from './cabinet.js'
+import Camera from './camera.js'
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0x111111 );
@@ -10,30 +13,21 @@ scene.background = new THREE.Color( 0x111111 );
 const light = new THREE.AmbientLight( 0xF0F0F0 );
 scene.add(light);
 
-const camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
-camera.position.z = 5;
-camera.position.y = 1.5;
-
 const renderer = new THREE.WebGLRenderer();
+
+const camera = new Camera(scene);
+
 
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 
+// Load cabinet models and create objects
 const loader = new GLTFLoader();
 
 let cabinets = [];
 
-cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF"));
-cabinets.push(new Cabinet(1, "Neon Rancer", "#00FFFF"));
-
-loader.load(cabinetModelFile, function ( cabinetModel ) {
-	cabinetModel = cabinetModel.scene.children[0] 
-	for (const cabinet of cabinets) {
-		cabinet.addToScene(scene, cabinetModel.clone());
-	}
-}, undefined, function ( error ) {
-	console.error( error );
-});
+//cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF"));
+cabinets.push(new Cabinet(0, "Neon Rancer", "#00FFFF", "neon-racer/src/game"));
 
 const pressedKeys = new Set();
 
@@ -42,29 +36,29 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('keyup', (event) => {
-        pressedKeys.delete(event.code);
+	pressedKeys.delete(event.code);
 });
 
-let lastFrameTime = new Date();
+loader.load(cabinetModelFile, async function ( cabinetModel ) {
+	cabinetModel = cabinetModel.scene.children[0] 
+	for (const cabinet of cabinets) {
+		await cabinet.addToScene(scene, cabinetModel.clone());
+	}
+
+	renderer.setAnimationLoop( animate );
+}, undefined, function ( error ) {
+	console.error( error );
+});
+
 
 function animate() {
-	let timeElapsed = ((new Date()) - lastFrameTime.getTime());
-	lastFrameTime = new Date();
+	camera.update(pressedKeys);
 
-	renderer.render( scene, camera );
+	let startKeyPressed = pressedKeys.has("Enter")
 
-	if (pressedKeys.has("KeyW")) {
-		camera.translateZ(timeElapsed*-0.001);
+	for (const cabinet of cabinets) {
+		cabinet.update(camera, startKeyPressed);
 	}
-	else if (pressedKeys.has("KeyS")) {
-		camera.translateZ(timeElapsed*0.001);
-	}
-	if (pressedKeys.has("KeyA")) {
-		camera.rotateY(timeElapsed*0.001);
-	}
-	else if (pressedKeys.has("KeyD")) {
-		camera.rotateY(timeElapsed*-0.001);
-	}
+
+	renderer.render( scene, camera.threeCamera );
 }
-
-renderer.setAnimationLoop( animate );

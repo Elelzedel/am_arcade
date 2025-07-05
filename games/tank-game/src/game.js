@@ -4,11 +4,22 @@ import Renderer from './renderer.js';
 import { calculateWind } from './utils/physics.js';
 import TankBot from './ai/bot.js';
 
-class TankGame {
-    constructor(gameMode = 'selfplay', difficulty = 'medium') {
+export default class TankGame {
+    constructor(gameMode = 'selfplay', difficulty = 'medium', subCanvas = null) {
         this.gameMode = gameMode; // 'multiplayer', 'singleplayer', 'selfplay'
         this.difficulty = difficulty;
-        this.canvas = document.getElementById('gameCanvas');
+
+		if (subCanvas == null) {
+			console.log("Running standalone");
+			this.canvas = document.getElementById('gameCanvas');
+		} else {
+			console.log("Running as arcade game");
+			this.arcadeMode = true;
+			this.canvas = subCanvas;
+			console.log(this.canvas);
+			console.log(this.canvas.getContext('2d'));
+		}
+
         this.ctx = this.canvas.getContext('2d');
         this.width = this.canvas.width;
         this.height = this.canvas.height;
@@ -42,7 +53,9 @@ class TankGame {
             this.bot = new TankBot(this.players[1], this.players[0], this.terrain, this.difficulty, this);
         }
         
-        this.initEventListeners();
+		if (this.arcadeMode != true) {
+			this.initEventListeners();
+		}
         this.resetWind();
         this.positionTanks();
         this.updatePlayerNames();
@@ -402,7 +415,9 @@ class GameMenu {
     }
 }
 
-// Initialize menu on load
-window.addEventListener('load', () => {
-    window.gameMenu = new GameMenu();
-});
+if (window.arcadeMode != true) {
+	// Initialize menu on load
+	window.addEventListener('load', () => {
+		window.gameMenu = new GameMenu();
+	});
+}

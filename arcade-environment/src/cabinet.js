@@ -1,13 +1,58 @@
 import * as THREE from 'three';
 
 export default class Cabinet {
-	constructor(place, name, color) {
+	constructor(place, name, color, gamePath) {
 		this.place = place;
 		this.name = name;
 		this.color = color;
+		this.gamePath = gamePath;
 	}
 
 	async addToScene(scene, model) {
+		this.addCabinetModel(scene, model);
+
+		let subCanvas = document.createElement('canvas');
+		subCanvas.width = 1024;
+		subCanvas.height = 576;
+
+		const screenGeometry = new THREE.PlaneGeometry( 0.7, 0.6 );
+		console.log("Adding to scene");
+
+		this.subCanvasTexture = new THREE.CanvasTexture(subCanvas);
+		this.subCanvasMaterial = new THREE.MeshBasicMaterial({map: this.subCanvasTexture})
+
+		this.screen = new THREE.Mesh( screenGeometry, this.subCanvasMaterial );
+
+		this.screen.rotateY(Math.PI/2);
+		this.screen.rotateX(-0.42);
+
+		this.screen.position.x = -4.2;
+		this.screen.position.y = 1.33;
+		this.screen.position.z = this.place * -3;
+
+
+		scene.add( this.screen );
+
+		const { default: Game } = await import (`../../games/${this.gamePath}.js`);
+		this.game = new Game(subCanvas);
+	}
+
+	async update(camera, startKeyPressed) {
+		this.subCanvasTexture.needsUpdate = true;
+
+		if (this.game.isRunning == false && startKeyPressed) {
+			camera.threeCamera.rotation.y = -Math.PI/2;
+			camera.threeCamera.rotation.y = Math.PI/2;
+			camera.threeCamera.position.z = 0;
+			camera.threeCamera.position.x = -0;
+
+			camera.locked = true;
+
+			this.game.start();
+		}
+	}
+
+	async addCabinetModel(scene, model) {
 		model.rotation.y = -Math.PI/2;
 		model.position.x = -5;
 		model.position.z = this.place * -3;
