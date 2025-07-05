@@ -25,16 +25,17 @@ export default class Cabinet {
 		this.screen = new THREE.Mesh( screenGeometry, this.subCanvasMaterial );
 
 		this.screen.rotateY(Math.PI/2);
-		this.screen.rotateX(-0.42);
+		this.screen.rotateX(-0.4);
 
-		this.screen.position.x = -4.2;
-		this.screen.position.y = 1.33;
+		this.screen.position.x = -4.21;
+		this.screen.position.y = 1.35;
 		this.screen.position.z = this.place * -3;
 
 
 		scene.add( this.screen );
 
 		const { default: Game } = await import (`../../games/${this.gamePath}.js`);
+
 		this.game = new Game(subCanvas);
 	}
 
@@ -87,7 +88,7 @@ export default class Cabinet {
 		texture.minFilter = THREE.NearestFilter;
 		texture.magFilter = THREE.NearestFilter;
 
-		const material = new THREE.MeshBasicMaterial({map: texture})
+		const material = new THREE.MeshLambertMaterial({map: texture})
 		model.material = material;
 
 		model.needsUpdate = true;

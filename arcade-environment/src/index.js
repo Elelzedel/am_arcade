@@ -10,7 +10,8 @@ import Camera from './camera.js'
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0x111111 );
 
-const light = new THREE.AmbientLight( 0xF0F0F0 );
+const light = new THREE.PointLight( 0xFFFFFF, 50 );
+light.position.set(0, 10, 0);
 scene.add(light);
 
 const renderer = new THREE.WebGLRenderer();
