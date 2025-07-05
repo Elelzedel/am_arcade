@@ -13,6 +13,7 @@ export default class Cabinet {
 
 	async addToScene(scene, baseModel) {
 		this.addCabinetModel(scene, baseModel);
+		this.addNamePlate(scene);
 
 		let subCanvas = document.createElement('canvas');
 		subCanvas.width = 1024;
@@ -61,7 +62,6 @@ export default class Cabinet {
 	}
 
 	async addCabinetModel(scene, baseModel) {
-
 		let image = baseModel.material.map.image;
 
 		const colSwapCanvas = document.createElement('canvas');
@@ -105,5 +105,31 @@ export default class Cabinet {
 		model.position.z = this.offsetZ;
 
 		scene.add(model);
+	}
+
+	async addNamePlate(scene) {
+		const namePlateCanvas = document.createElement('canvas');
+		namePlateCanvas.width = 500;
+		namePlateCanvas.height = 100;
+
+		const namePlateCanvasCtx = namePlateCanvas.getContext('2d');
+
+		namePlateCanvasCtx.font = "50px serif";
+		namePlateCanvasCtx.textAlign = "center";
+		namePlateCanvasCtx.fillStyle = this.color;
+		namePlateCanvasCtx.fillText(this.name, 250, 50);
+
+		const namePlateTexture = new THREE.CanvasTexture(namePlateCanvas);
+		const namePlateMaterial = new THREE.MeshBasicMaterial({map: namePlateTexture, transparent: true})
+
+		const namePlateGeometry = new THREE.PlaneGeometry( 1, 0.2 );
+		const namePlate = new THREE.Mesh( namePlateGeometry, namePlateMaterial );
+
+		namePlate.rotation.y = Math.PI/2;
+		namePlate.position.x = -3.98;
+		namePlate.position.y = 1.771;
+		namePlate.position.z = this.offsetZ;
+
+		scene.add(namePlate);
 	}
 }
