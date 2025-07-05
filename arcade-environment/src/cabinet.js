@@ -53,7 +53,7 @@ export default class Cabinet {
 			}
 
 			this.starting = true;
-			camera.setRubberBand(-2.7, this.place * -3, Math.PI/2);
+			camera.setRubberBand(-2.7, this.place * -3, 0, Math.PI/2, 0);
 			camera.locked = true;
 		} else if(this.starting && camera.rubberBand == false) {
 			this.starting = false;
@@ -74,10 +74,8 @@ export default class Cabinet {
 		let imageData = colSwapCanvasCtx.getImageData(0, 0, colSwapCanvas.width, colSwapCanvas.height);
 
 		let colorReg = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(this.color);
-		console.log(colorReg);
 
 		for (let i = 0; i < imageData.data.length; i += 4) {
-			console.log(imageData.data[i]);
 			// Swap magenta
 			if (imageData.data[i] === 255 && imageData.data[i + 2] === 255) {
 				imageData.data[i] = parseInt(colorReg[1], 16);
@@ -120,7 +118,7 @@ export default class Cabinet {
 		namePlateCanvasCtx.fillText(this.name, 250, 50);
 
 		const namePlateTexture = new THREE.CanvasTexture(namePlateCanvas);
-		const namePlateMaterial = new THREE.MeshBasicMaterial({map: namePlateTexture, transparent: true})
+		const namePlateMaterial = new THREE.MeshPhongMaterial({map: namePlateTexture, transparent: true})
 
 		const namePlateGeometry = new THREE.PlaneGeometry( 1, 0.2 );
 		const namePlate = new THREE.Mesh( namePlateGeometry, namePlateMaterial );
