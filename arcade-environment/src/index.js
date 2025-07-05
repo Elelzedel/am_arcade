@@ -17,7 +17,6 @@ const renderer = new THREE.WebGLRenderer();
 
 const camera = new Camera(scene);
 
-
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 

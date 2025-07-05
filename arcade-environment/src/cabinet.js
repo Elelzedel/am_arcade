@@ -6,6 +6,7 @@ export default class Cabinet {
 		this.name = name;
 		this.color = color;
 		this.gamePath = gamePath;
+		this.starting = false;
 	}
 
 	async addToScene(scene, model) {
@@ -40,14 +41,12 @@ export default class Cabinet {
 	async update(camera, startKeyPressed) {
 		this.subCanvasTexture.needsUpdate = true;
 
-		if (this.game.isRunning == false && startKeyPressed) {
-			camera.threeCamera.rotation.y = -Math.PI/2;
-			camera.threeCamera.rotation.y = Math.PI/2;
-			camera.threeCamera.position.z = 0;
-			camera.threeCamera.position.x = -0;
-
+		if (this.starting == false && startKeyPressed) {
+			this.starting = true;
+			camera.setRubberBand(-2.7, this.place * -3, Math.PI/2);
 			camera.locked = true;
-
+		} else if(this.starting && camera.rubberBand == false) {
+			this.starting = false;
 			this.game.start();
 		}
 	}
