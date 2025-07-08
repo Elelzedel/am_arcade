@@ -7,6 +7,7 @@ export default class Cabinet {
 		this.color = color;
 		this.gamePath = gamePath;
 		this.starting = false;
+		this.gameActive = false;
 
 		this.offsetZ = place * -3;
 	}
@@ -57,7 +58,27 @@ export default class Cabinet {
 			camera.locked = true;
 		} else if(this.starting && camera.rubberBand == false) {
 			this.starting = false;
+			this.gameActive = true;
 			this.game.start();
+		}
+	}
+
+	handleKeyDown(event) {
+		if (this.gameActive && this.game.handleKeyDown) {
+			this.game.handleKeyDown(event);
+		}
+	}
+
+	handleKeyUp(event) {
+		if (this.gameActive && this.game.handleKeyUp) {
+			this.game.handleKeyUp(event);
+		}
+	}
+
+	deactivate() {
+		this.gameActive = false;
+		if (this.game.cleanup) {
+			this.game.cleanup();
 		}
 	}
 

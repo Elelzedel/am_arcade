@@ -5,20 +5,22 @@ import { calculateWind } from './utils/physics.js';
 import TankBot from './ai/bot.js';
 
 export default class TankGame {
-    constructor(gameMode = 'selfplay', difficulty = 'medium', subCanvas = null) {
-        this.gameMode = gameMode; // 'multiplayer', 'singleplayer', 'selfplay'
-        this.difficulty = difficulty;
-
-		if (subCanvas == null) {
-			console.log("Running standalone");
-			this.canvas = document.getElementById('gameCanvas');
-		} else {
-			console.log("Running as arcade game");
-			this.arcadeMode = true;
-			this.canvas = subCanvas;
-			console.log(this.canvas);
-			console.log(this.canvas.getContext('2d'));
-		}
+    constructor(gameModeOrCanvas = 'selfplay', difficulty = 'medium', subCanvas = null) {
+        // Check if first parameter is a canvas (arcade mode)
+        if (gameModeOrCanvas && typeof gameModeOrCanvas === 'object' && gameModeOrCanvas.getContext) {
+            console.log("Running as arcade game");
+            this.arcadeMode = true;
+            this.canvas = gameModeOrCanvas;
+            this.gameMode = 'selfplay';
+            this.difficulty = 'medium';
+        } else {
+            // Standalone mode with gameMode and difficulty parameters
+            console.log("Running standalone");
+            this.gameMode = gameModeOrCanvas;
+            this.difficulty = difficulty;
+            this.arcadeMode = false;
+            this.canvas = document.getElementById('gameCanvas');
+        }
 
         this.ctx = this.canvas.getContext('2d');
         this.width = this.canvas.width;
@@ -60,7 +62,6 @@ export default class TankGame {
         this.positionTanks();
         this.updatePlayerNames();
         this.updateUI();
-        this.gameLoop();
     }
     
     initEventListeners() {
@@ -90,6 +91,16 @@ export default class TankGame {
     }
     
     handleKeyDown(e) {
+        // Handle game over state
+        if (this.gameState === 'gameover' && this.arcadeMode) {
+            if (e.key === ' ') {
+                e.preventDefault();
+                this.restartGame();
+                return;
+            }
+            return;
+        }
+        
         if (this.gameState !== 'aiming') return;
         
         // Prevent input during bot's turn
@@ -161,13 +172,22 @@ export default class TankGame {
     }
     
     updateProjectiles(deltaTime) {
+        // Don't update projectiles if game is over
+        if (this.gameState === 'gameover') {
+            this.projectiles = [];
+            return;
+        }
+        
         this.projectiles = this.projectiles.filter(projectile => {
             projectile.update(deltaTime, this.wind);
 
             // 1. Check for tank hits
             if (this.checkTankHits(projectile.x, projectile.y)) {
                 this.terrain.createCrater(projectile.x, 30); // Crater on hit
-                this.endTurn();
+                // Don't end turn if game is now over
+                if (this.gameState !== 'gameover') {
+                    this.endTurn();
+                }
                 return false; // Remove projectile
             }
             
@@ -220,6 +240,7 @@ export default class TankGame {
                 hitOccurred = true;
                 
                 if (tank.lives <= 0) {
+                    console.log(`Player ${tank.player} defeated! Lives: ${tank.lives}`);
                     this.gameOver(tank.player === 1 ? 2 : 1);
                 }
             }
@@ -228,6 +249,11 @@ export default class TankGame {
     }
     
     async endTurn() {
+        // Don't process turn changes if game is over
+        if (this.gameState === 'gameover') {
+            return;
+        }
+        
         this.gameState = 'aiming';
         this.currentPlayer = (this.currentPlayer + 1) % 2;
         this.resetWind();
@@ -248,13 +274,16 @@ export default class TankGame {
     
     gameOver(winner) {
         this.gameState = 'gameover';
+        this.winner = winner;
         
-        const victoryScreen = document.getElementById('victoryScreen');
-        const victoryMessage = document.getElementById('victoryMessage');
-        
-        if (victoryScreen && victoryMessage) {
-            victoryMessage.textContent = `Player ${winner} Wins!`;
-            victoryScreen.style.display = 'flex';
+        if (!this.arcadeMode) {
+            const victoryScreen = document.getElementById('victoryScreen');
+            const victoryMessage = document.getElementById('victoryMessage');
+            
+            if (victoryScreen && victoryMessage) {
+                victoryMessage.textContent = `Player ${winner} Wins!`;
+                victoryScreen.style.display = 'flex';
+            }
         }
     }
     
@@ -317,6 +346,346 @@ export default class TankGame {
         }
     }
     
+    start() {
+        console.log('Starting tank game...');
+        
+        // In arcade mode, input is handled by the cabinet
+        if (!this.arcadeMode) {
+            // Only add event listeners in standalone mode
+            if (this.initEventListeners) {
+                this.initEventListeners();
+            }
+        }
+        
+        this.gameLoop();
+    }
+    
+    restartGame() {
+        // Reset game state
+        this.gameState = 'aiming';
+        this.currentPlayer = 0;
+        this.projectiles = [];
+        this.winner = null;
+        
+        // Reset player health and positions
+        this.players[0].lives = 3;
+        this.players[1].lives = 3;
+        this.players[0].x = 150;
+        this.players[1].x = this.width - 150;
+        this.players[0].angle = 45;
+        this.players[1].angle = 135;
+        this.players[0].power = 50;
+        this.players[1].power = 50;
+        
+        // Generate new terrain
+        const mapTypes = ['hills', 'jagged', 'valley', 'tower', 'flat', 'bridge'];
+        const randomMapType = mapTypes[Math.floor(Math.random() * mapTypes.length)];
+        this.terrain = new Terrain(this.width, this.height, randomMapType);
+        
+        // Reset scale for large maps
+        const largeMaps = ['bridge', 'jagged'];
+        this.scale = largeMaps.includes(randomMapType) ? 0.75 : 1.0;
+        
+        // Reset wind and position tanks
+        this.resetWind();
+        this.positionTanks();
+        this.updateUI();
+    }
+    
+    drawArcadeInstructions() {
+        this.ctx.save();
+        
+        // Position below health bars
+        const instructionY = 50;
+        
+        // Semi-transparent background for instructions
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, instructionY, 280, 100);
+        
+        // Instructions text
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '16px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Arrow Keys: Aim/Power', 20, instructionY + 25);
+        this.ctx.fillText('Space: Fire', 20, instructionY + 45);
+        this.ctx.fillText('Q: Exit to Arcade', 20, instructionY + 65);
+        
+        // Current player turn
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = this.currentPlayer === 0 ? '#ff6b6b' : '#5ac8fa';
+        this.ctx.fillText(`Player ${this.currentPlayer + 1}'s Turn`, 20, instructionY + 85);
+        
+        this.ctx.restore();
+    }
+    
+    drawArcadeUI() {
+        const currentTank = this.players[this.currentPlayer];
+        
+        // Draw player health bars at top
+        this.drawHealthBars();
+        
+        // Draw angle and power indicators at bottom
+        this.drawControlIndicators(currentTank);
+        
+        // Draw wind indicator
+        this.drawWindIndicator();
+    }
+    
+    drawHealthBars() {
+        this.ctx.save();
+        
+        const barWidth = 200;
+        const barHeight = 30;
+        const barY = 160; // Position below instructions panel
+        const padding = 40;
+        
+        // Background panel for health bars
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(padding - 10, barY - 35, this.width - (padding * 2) + 20, barHeight + 45);
+        
+        // Title
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 16px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('HEALTH', this.width / 2, barY - 10);
+        
+        // Player 1 health bar (left side)
+        const p1X = padding;
+        
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(p1X, barY, barWidth, barHeight);
+        
+        // Health fill
+        const p1HealthWidth = Math.max(0, (this.players[0].lives / 3) * barWidth);
+        if (p1HealthWidth > 0) {
+            const gradient1 = this.ctx.createLinearGradient(p1X, barY, p1X + p1HealthWidth, barY);
+            gradient1.addColorStop(0, '#ff4444');
+            gradient1.addColorStop(1, '#ff6b6b');
+            this.ctx.fillStyle = gradient1;
+            this.ctx.fillRect(p1X, barY, p1HealthWidth, barHeight);
+        }
+        
+        // Border
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(p1X, barY, barWidth, barHeight);
+        
+        // Player label
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Player 1', p1X + 5, barY + 20);
+        
+        // Lives text
+        this.ctx.textAlign = 'right';
+        const p1Lives = Math.max(0, this.players[0].lives);
+        this.ctx.fillText(`${p1Lives}/3`, p1X + barWidth - 5, barY + 20);
+        
+        // Player 2 health bar (right side)
+        const p2X = this.width - barWidth - padding;
+        
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(p2X, barY, barWidth, barHeight);
+        
+        // Health fill
+        const p2HealthWidth = Math.max(0, (this.players[1].lives / 3) * barWidth);
+        if (p2HealthWidth > 0) {
+            const gradient2 = this.ctx.createLinearGradient(p2X, barY, p2X + p2HealthWidth, barY);
+            gradient2.addColorStop(0, '#4488ff');
+            gradient2.addColorStop(1, '#5ac8fa');
+            this.ctx.fillStyle = gradient2;
+            this.ctx.fillRect(p2X, barY, p2HealthWidth, barHeight);
+        }
+        
+        // Border
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.strokeRect(p2X, barY, barWidth, barHeight);
+        
+        // Player label
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Player 2', p2X + 5, barY + 20);
+        
+        // Lives text
+        this.ctx.textAlign = 'right';
+        const p2Lives = Math.max(0, this.players[1].lives);
+        this.ctx.fillText(`${p2Lives}/3`, p2X + barWidth - 5, barY + 20);
+        
+        this.ctx.restore();
+    }
+    
+    drawControlIndicators(currentTank) {
+        this.ctx.save();
+        
+        const bottomY = this.height - 80;
+        const barWidth = 200;
+        const barHeight = 25;
+        const centerX = this.width / 2;
+        
+        // Angle indicator
+        const angleX = centerX - barWidth - 20;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(angleX, bottomY, barWidth, barHeight);
+        
+        const angleProgress = (currentTank.angle / 180) * barWidth;
+        this.ctx.fillStyle = '#ffd93d';
+        this.ctx.fillRect(angleX, bottomY, angleProgress, barHeight);
+        
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(angleX, bottomY, barWidth, barHeight);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '14px Arial';
+        this.ctx.fillText(`Angle: ${Math.round(currentTank.angle)}°`, angleX + 5, bottomY - 5);
+        
+        // Power indicator
+        const powerX = centerX + 20;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(powerX, bottomY, barWidth, barHeight);
+        
+        const powerProgress = (currentTank.power / 100) * barWidth;
+        this.ctx.fillStyle = '#6bcf7f';
+        this.ctx.fillRect(powerX, bottomY, powerProgress, barHeight);
+        
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.strokeRect(powerX, bottomY, barWidth, barHeight);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText(`Power: ${Math.round(currentTank.power)}%`, powerX + 5, bottomY - 5);
+        
+        this.ctx.restore();
+    }
+    
+    drawWindIndicator() {
+        this.ctx.save();
+        
+        const centerX = this.width / 2;
+        const bottomY = this.height - 120; // Move up to avoid overlap with bottom controls
+        const indicatorWidth = 150;
+        const indicatorHeight = 25;
+        const windX = centerX - indicatorWidth / 2;
+        
+        // Background panel
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(windX - 10, bottomY - 30, indicatorWidth + 20, indicatorHeight + 40);
+        
+        // Background for indicator
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        this.ctx.fillRect(windX, bottomY, indicatorWidth, indicatorHeight);
+        
+        // Wind bar
+        const windStrength = Math.abs(this.wind.speed) / 10; // Normalize to 0-1
+        const barWidth = windStrength * (indicatorWidth / 2);
+        
+        if (this.wind.direction > 0) {
+            // Wind going right
+            this.ctx.fillStyle = '#87ceeb';
+            this.ctx.fillRect(centerX, bottomY, barWidth, indicatorHeight);
+            
+            // Arrow
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX + barWidth + 5, bottomY + indicatorHeight / 2);
+            this.ctx.lineTo(centerX + barWidth, bottomY + 2);
+            this.ctx.lineTo(centerX + barWidth, bottomY + indicatorHeight - 2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        } else {
+            // Wind going left
+            this.ctx.fillStyle = '#87ceeb';
+            this.ctx.fillRect(centerX - barWidth, bottomY, barWidth, indicatorHeight);
+            
+            // Arrow
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX - barWidth - 5, bottomY + indicatorHeight / 2);
+            this.ctx.lineTo(centerX - barWidth, bottomY + 2);
+            this.ctx.lineTo(centerX - barWidth, bottomY + indicatorHeight - 2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // Border
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(windX, bottomY, indicatorWidth, indicatorHeight);
+        
+        // Center line
+        this.ctx.beginPath();
+        this.ctx.moveTo(centerX, bottomY);
+        this.ctx.lineTo(centerX, bottomY + indicatorHeight);
+        this.ctx.stroke();
+        
+        // Wind text
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`WIND: ${Math.abs(Math.round(this.wind.speed))} mph`, centerX, bottomY - 8);
+        
+        this.ctx.restore();
+    }
+    
+    drawVictoryScreen() {
+        this.ctx.save();
+        
+        // Dark overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Victory panel
+        const panelWidth = 600;
+        const panelHeight = 400;
+        const panelX = (this.width - panelWidth) / 2;
+        const panelY = (this.height - panelHeight) / 2;
+        
+        // Panel background
+        this.ctx.fillStyle = 'rgba(20, 20, 40, 0.95)';
+        this.ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel border
+        this.ctx.strokeStyle = this.winner === 1 ? '#ff6b6b' : '#5ac8fa';
+        this.ctx.lineWidth = 4;
+        this.ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Victory text
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('VICTORY!', this.width / 2, panelY + 80);
+        
+        // Winner text
+        this.ctx.fillStyle = this.winner === 1 ? '#ff6b6b' : '#5ac8fa';
+        this.ctx.font = 'bold 36px Arial';
+        this.ctx.fillText(`Player ${this.winner} Wins!`, this.width / 2, panelY + 140);
+        
+        // Final scores
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '24px Arial';
+        this.ctx.fillText('Final Score', this.width / 2, panelY + 200);
+        
+        // Player scores
+        this.ctx.font = '20px Arial';
+        this.ctx.textAlign = 'left';
+        const scoreX = panelX + 150;
+        
+        this.ctx.fillStyle = '#ff6b6b';
+        this.ctx.fillText(`Player 1: ${this.players[0].lives} lives remaining`, scoreX, panelY + 240);
+        
+        this.ctx.fillStyle = '#5ac8fa';
+        this.ctx.fillText(`Player 2: ${this.players[1].lives} lives remaining`, scoreX, panelY + 270);
+        
+        // Instructions
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 20px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Press SPACE to play again', this.width / 2, panelY + 340);
+        this.ctx.fillText('Press Q to exit to arcade', this.width / 2, panelY + 370);
+        
+        this.ctx.restore();
+    }
     
     gameLoop() {
         const deltaTime = 1/60;
@@ -337,6 +706,17 @@ export default class TankGame {
         
         if (this.gameState === 'aiming') {
             this.renderer.drawCurrentPlayerIndicator(this.players[this.currentPlayer]);
+        }
+        
+        // Draw arcade mode UI
+        if (this.arcadeMode) {
+            this.drawArcadeUI();
+            this.drawArcadeInstructions();
+            
+            // Draw victory screen if game is over
+            if (this.gameState === 'gameover') {
+                this.drawVictoryScreen();
+            }
         }
         
         requestAnimationFrame(() => this.gameLoop());
