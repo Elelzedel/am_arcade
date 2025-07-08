@@ -335,21 +335,229 @@ export default class TankGame {
     drawArcadeInstructions() {
         this.ctx.save();
         
+        // Position below health bars
+        const instructionY = 50;
+        
         // Semi-transparent background for instructions
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(10, 10, 280, 100);
+        this.ctx.fillRect(10, instructionY, 280, 100);
         
         // Instructions text
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.font = '16px Arial';
-        this.ctx.fillText('Arrow Keys: Aim/Power', 20, 35);
-        this.ctx.fillText('Space: Fire', 20, 55);
-        this.ctx.fillText('Q: Exit to Arcade', 20, 75);
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Arrow Keys: Aim/Power', 20, instructionY + 25);
+        this.ctx.fillText('Space: Fire', 20, instructionY + 45);
+        this.ctx.fillText('Q: Exit to Arcade', 20, instructionY + 65);
         
         // Current player turn
         this.ctx.font = '14px Arial';
         this.ctx.fillStyle = this.currentPlayer === 0 ? '#ff6b6b' : '#5ac8fa';
-        this.ctx.fillText(`Player ${this.currentPlayer + 1}'s Turn`, 20, 95);
+        this.ctx.fillText(`Player ${this.currentPlayer + 1}'s Turn`, 20, instructionY + 85);
+        
+        this.ctx.restore();
+    }
+    
+    drawArcadeUI() {
+        const currentTank = this.players[this.currentPlayer];
+        
+        // Draw player health bars at top
+        this.drawHealthBars();
+        
+        // Draw angle and power indicators at bottom
+        this.drawControlIndicators(currentTank);
+        
+        // Draw wind indicator
+        this.drawWindIndicator();
+    }
+    
+    drawHealthBars() {
+        this.ctx.save();
+        
+        const barWidth = 200;
+        const barHeight = 30;
+        const barY = 160; // Position below instructions panel
+        const padding = 40;
+        
+        // Background panel for health bars
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(padding - 10, barY - 35, this.width - (padding * 2) + 20, barHeight + 45);
+        
+        // Title
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 16px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('HEALTH', this.width / 2, barY - 10);
+        
+        // Player 1 health bar (left side)
+        const p1X = padding;
+        
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(p1X, barY, barWidth, barHeight);
+        
+        // Health fill
+        const p1HealthWidth = (this.players[0].lives / 3) * barWidth;
+        const gradient1 = this.ctx.createLinearGradient(p1X, barY, p1X + p1HealthWidth, barY);
+        gradient1.addColorStop(0, '#ff4444');
+        gradient1.addColorStop(1, '#ff6b6b');
+        this.ctx.fillStyle = gradient1;
+        this.ctx.fillRect(p1X, barY, p1HealthWidth, barHeight);
+        
+        // Border
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(p1X, barY, barWidth, barHeight);
+        
+        // Player label
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Player 1', p1X + 5, barY + 20);
+        
+        // Lives text
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText(`${this.players[0].lives}/3`, p1X + barWidth - 5, barY + 20);
+        
+        // Player 2 health bar (right side)
+        const p2X = this.width - barWidth - padding;
+        
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(p2X, barY, barWidth, barHeight);
+        
+        // Health fill
+        const p2HealthWidth = (this.players[1].lives / 3) * barWidth;
+        const gradient2 = this.ctx.createLinearGradient(p2X, barY, p2X + p2HealthWidth, barY);
+        gradient2.addColorStop(0, '#4488ff');
+        gradient2.addColorStop(1, '#5ac8fa');
+        this.ctx.fillStyle = gradient2;
+        this.ctx.fillRect(p2X, barY, p2HealthWidth, barHeight);
+        
+        // Border
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.strokeRect(p2X, barY, barWidth, barHeight);
+        
+        // Player label
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('Player 2', p2X + 5, barY + 20);
+        
+        // Lives text
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText(`${this.players[1].lives}/3`, p2X + barWidth - 5, barY + 20);
+        
+        this.ctx.restore();
+    }
+    
+    drawControlIndicators(currentTank) {
+        this.ctx.save();
+        
+        const bottomY = this.height - 80;
+        const barWidth = 200;
+        const barHeight = 25;
+        const centerX = this.width / 2;
+        
+        // Angle indicator
+        const angleX = centerX - barWidth - 20;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(angleX, bottomY, barWidth, barHeight);
+        
+        const angleProgress = (currentTank.angle / 180) * barWidth;
+        this.ctx.fillStyle = '#ffd93d';
+        this.ctx.fillRect(angleX, bottomY, angleProgress, barHeight);
+        
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(angleX, bottomY, barWidth, barHeight);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '14px Arial';
+        this.ctx.fillText(`Angle: ${Math.round(currentTank.angle)}°`, angleX + 5, bottomY - 5);
+        
+        // Power indicator
+        const powerX = centerX + 20;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(powerX, bottomY, barWidth, barHeight);
+        
+        const powerProgress = (currentTank.power / 100) * barWidth;
+        this.ctx.fillStyle = '#6bcf7f';
+        this.ctx.fillRect(powerX, bottomY, powerProgress, barHeight);
+        
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.strokeRect(powerX, bottomY, barWidth, barHeight);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText(`Power: ${Math.round(currentTank.power)}%`, powerX + 5, bottomY - 5);
+        
+        this.ctx.restore();
+    }
+    
+    drawWindIndicator() {
+        this.ctx.save();
+        
+        const centerX = this.width / 2;
+        const bottomY = this.height - 120; // Move up to avoid overlap with bottom controls
+        const indicatorWidth = 150;
+        const indicatorHeight = 25;
+        const windX = centerX - indicatorWidth / 2;
+        
+        // Background panel
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(windX - 10, bottomY - 30, indicatorWidth + 20, indicatorHeight + 40);
+        
+        // Background for indicator
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        this.ctx.fillRect(windX, bottomY, indicatorWidth, indicatorHeight);
+        
+        // Wind bar
+        const windStrength = Math.abs(this.wind.speed) / 10; // Normalize to 0-1
+        const barWidth = windStrength * (indicatorWidth / 2);
+        
+        if (this.wind.direction > 0) {
+            // Wind going right
+            this.ctx.fillStyle = '#87ceeb';
+            this.ctx.fillRect(centerX, bottomY, barWidth, indicatorHeight);
+            
+            // Arrow
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX + barWidth + 5, bottomY + indicatorHeight / 2);
+            this.ctx.lineTo(centerX + barWidth, bottomY + 2);
+            this.ctx.lineTo(centerX + barWidth, bottomY + indicatorHeight - 2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        } else {
+            // Wind going left
+            this.ctx.fillStyle = '#87ceeb';
+            this.ctx.fillRect(centerX - barWidth, bottomY, barWidth, indicatorHeight);
+            
+            // Arrow
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX - barWidth - 5, bottomY + indicatorHeight / 2);
+            this.ctx.lineTo(centerX - barWidth, bottomY + 2);
+            this.ctx.lineTo(centerX - barWidth, bottomY + indicatorHeight - 2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // Border
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(windX, bottomY, indicatorWidth, indicatorHeight);
+        
+        // Center line
+        this.ctx.beginPath();
+        this.ctx.moveTo(centerX, bottomY);
+        this.ctx.lineTo(centerX, bottomY + indicatorHeight);
+        this.ctx.stroke();
+        
+        // Wind text
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 14px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`WIND: ${Math.abs(Math.round(this.wind.speed))} mph`, centerX, bottomY - 8);
         
         this.ctx.restore();
     }
@@ -375,8 +583,9 @@ export default class TankGame {
             this.renderer.drawCurrentPlayerIndicator(this.players[this.currentPlayer]);
         }
         
-        // Draw arcade mode instructions
+        // Draw arcade mode UI
         if (this.arcadeMode) {
+            this.drawArcadeUI();
             this.drawArcadeInstructions();
         }
         
