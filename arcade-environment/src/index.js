@@ -26,7 +26,7 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 const controls = new PointerLockControls(camera.threeCamera, renderer.domElement)
 
 let activeCabinet = null;
-EngagementHandler.createElements(controls, activeCabinet);
+let engagementHandler = new EngagementHandler(controls, activeCabinet);
 document.body.appendChild( renderer.domElement );
 
 // Load cabinet models and create objects
@@ -98,10 +98,10 @@ function animate() {
 		// Re-enable mouse look when exiting game
 		controls.enabled = true;
 		// Hide re-engagement div when exiting game
-		reEngagementDiv.style.display = "none";
+		engagementHandler.reEngagementDiv.style.display = "none";
 		// Keep engagement div hidden if pointer lock is still active
 		if (document.pointerLockElement) {
-			engagementDiv.style.display = "none";
+			engagementHandler.engagementDiv.style.display = "none";
 		}
 	}
 

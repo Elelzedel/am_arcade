@@ -1,5 +1,5 @@
 export default class EngagementHandler {
-	static createElements(controls, activeCabinet) {
+	constructor(controls, activeCabinet) {
 		const instructionsDiv = document.createElement("div");
 		instructionsDiv.style.width = "100%";
 		instructionsDiv.style.height = "100%";
@@ -18,41 +18,41 @@ export default class EngagementHandler {
 			Release mouse - ESC<br\>
 		`;
 
-		const engagementDiv = document.createElement("div");
-		engagementDiv.style.position = "absolute";
-		engagementDiv.style.width = "100%";
-		engagementDiv.style.height = "100%";
-		engagementDiv.style.backgroundColor = "#00000055";
-		engagementDiv.style.color = "#FFFFFF";
+		this.engagementDiv = document.createElement("div");
+		this.engagementDiv.style.position = "absolute";
+		this.engagementDiv.style.width = "100%";
+		this.engagementDiv.style.height = "100%";
+		this.engagementDiv.style.backgroundColor = "#00000055";
+		this.engagementDiv.style.color = "#FFFFFF";
 
-		engagementDiv.appendChild(instructionsDiv);
+		this.engagementDiv.appendChild(instructionsDiv);
 
-		document.body.appendChild(engagementDiv);
+		document.body.appendChild(this.engagementDiv);
 
-		engagementDiv.addEventListener("click", async () => {
+		this.engagementDiv.addEventListener("click", async () => {
 			controls.lock();
-			engagementDiv.style.display = "none";
+			this.engagementDiv.style.display = "none";
 		});
 
 		// Create a special re-engagement message for when in-game
-		const reEngagementDiv = document.createElement("div");
-		reEngagementDiv.style.position = "fixed";
-		reEngagementDiv.style.top = "0";
-		reEngagementDiv.style.left = "0";
-		reEngagementDiv.style.width = "100%";
-		reEngagementDiv.style.height = "100%";
-		reEngagementDiv.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
-		reEngagementDiv.style.color = "#FFFFFF";
-		reEngagementDiv.style.display = "none";
-		reEngagementDiv.style.flexDirection = "column";
-		reEngagementDiv.style.justifyContent = "center";
-		reEngagementDiv.style.alignItems = "center";
-		reEngagementDiv.style.textAlign = "center";
-		reEngagementDiv.style.fontSize = "1.5vw";
-		reEngagementDiv.style.zIndex = "9999";
-		reEngagementDiv.style.cursor = "pointer";
+		this.reEngagementDiv = document.createElement("div");
+		this.reEngagementDiv.style.position = "fixed";
+		this.reEngagementDiv.style.top = "0";
+		this.reEngagementDiv.style.left = "0";
+		this.reEngagementDiv.style.width = "100%";
+		this.reEngagementDiv.style.height = "100%";
+		this.reEngagementDiv.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+		this.reEngagementDiv.style.color = "#FFFFFF";
+		this.reEngagementDiv.style.display = "none";
+		this.reEngagementDiv.style.flexDirection = "column";
+		this.reEngagementDiv.style.justifyContent = "center";
+		this.reEngagementDiv.style.alignItems = "center";
+		this.reEngagementDiv.style.textAlign = "center";
+		this.reEngagementDiv.style.fontSize = "1.5vw";
+		this.reEngagementDiv.style.zIndex = "9999";
+		this.reEngagementDiv.style.cursor = "pointer";
 
-		reEngagementDiv.innerHTML = `
+		this.reEngagementDiv.innerHTML = `
 			<div>
 				<h2>Mouse Released</h2>
 				<p>Click to re-engage mouse control</p>
@@ -60,14 +60,14 @@ export default class EngagementHandler {
 			</div>
 		`;
 
-		document.body.appendChild(reEngagementDiv);
+		document.body.appendChild(this.reEngagementDiv);
 		console.log('Re-engagement div created and appended');
 
 		// Handle click on re-engagement div
-		reEngagementDiv.addEventListener("click", () => {
+		this.reEngagementDiv.addEventListener("click", () => {
 			console.log('Re-engagement div clicked');
 			controls.lock();
-			reEngagementDiv.style.display = "none";
+			this.reEngagementDiv.style.display = "none";
 		});
 
 		// Show engagement div again when pointer lock is lost
@@ -76,18 +76,18 @@ export default class EngagementHandler {
 			if (activeCabinet) {
 				// Show re-engagement div when in a game
 				console.log('Showing re-engagement div');
-				reEngagementDiv.style.display = "flex";
+				this.reEngagementDiv.style.display = "flex";
 			} else {
 				// Show normal engagement div when not in a game
 				console.log('Showing normal engagement div');
-				engagementDiv.style.display = "block";
+				this.engagementDiv.style.display = "block";
 			}
 		});
 
 		// Hide re-engagement div when pointer lock is acquired
 		controls.addEventListener('lock', () => {
 			console.log('Pointer lock acquired');
-			reEngagementDiv.style.display = "none";
+			this.reEngagementDiv.style.display = "none";
 			
 			// Keep controls disabled if in a game
 			if (activeCabinet) {
