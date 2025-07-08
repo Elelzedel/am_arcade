@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 
 const RUBBER_BAND_S = 2;
+const HEIGHT = 1.65;
 
 export default class Camera {
 	constructor(scene) {
 		this.threeCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+		this.threeCamera.position.y = HEIGHT;
 		this.threeCamera.position.z = 5;
-		this.threeCamera.position.y = 1.5;
+
+		// Prevent gimbal lock when looking at arcade
+		this.threeCamera.rotation.order = 'ZYX';
 
 		this.lastFrameTime = new Date();
 
@@ -31,19 +36,19 @@ export default class Camera {
 
 		if (pressedKeys.has("KeyW") || pressedKeys.has("KeyI")) {
 			this.threeCamera.translateZ(timeElapsed*-0.0025);
-			this.threeCamera.position.y = 1.5;
+			this.threeCamera.position.y = HEIGHT;
 		}
 		else if (pressedKeys.has("KeyS") || pressedKeys.has("KeyK")) {
 			this.threeCamera.translateZ(timeElapsed*0.0025);
-			this.threeCamera.position.y = 1.5;
+			this.threeCamera.position.y = HEIGHT;
 		}
 		if (pressedKeys.has("KeyA") || pressedKeys.has("KeyJ")) {
 			this.threeCamera.translateX(timeElapsed*-0.0025);
-			this.threeCamera.position.y = 1.5;
+			this.threeCamera.position.y = HEIGHT;
 		}
 		else if (pressedKeys.has("KeyD") || pressedKeys.has("KeyL")) {
 			this.threeCamera.translateX(timeElapsed*+0.0025);
-			this.threeCamera.position.y = 1.5;
+			this.threeCamera.position.y = HEIGHT;
 		}
 	}
 

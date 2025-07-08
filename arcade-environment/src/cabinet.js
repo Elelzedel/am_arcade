@@ -54,7 +54,7 @@ export default class Cabinet {
 			}
 
 			this.starting = true;
-			camera.setRubberBand(-2.7, this.place * -3, 0, Math.PI/2, 0);
+			camera.setRubberBand(-3.6, this.place * -3, 0, Math.PI/2, 0.48);
 			camera.locked = true;
 		} else if(this.starting && camera.rubberBand == false) {
 			this.starting = false;
