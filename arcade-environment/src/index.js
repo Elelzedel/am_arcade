@@ -114,6 +114,11 @@ controls.addEventListener('unlock', () => {
 controls.addEventListener('lock', () => {
 	console.log('Pointer lock acquired');
 	reEngagementDiv.style.display = "none";
+	
+	// Keep controls disabled if in a game
+	if (activeCabinet) {
+		controls.enabled = false;
+	}
 });
 
 // Load cabinet models and create objects
@@ -183,6 +188,8 @@ function animate() {
 		activeCabinet.deactivate();
 		activeCabinet = null;
 		camera.locked = false;
+		// Re-enable mouse look when exiting game
+		controls.enabled = true;
 		// Hide re-engagement div when exiting game
 		reEngagementDiv.style.display = "none";
 		// Keep engagement div hidden if pointer lock is still active
@@ -202,6 +209,9 @@ function animate() {
 			}
 			activeCabinet = cabinet;
 			console.log('Active cabinet set:', cabinet.name);
+			
+			// Disable mouse look when game starts
+			controls.enabled = false;
 		}
 	}
 
