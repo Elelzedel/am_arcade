@@ -23,6 +23,8 @@ instructionsDiv.innerHTML = `
 	Click inside screen to play<br\>
 	Movement - WASD or IJKL<br\>
 	Activate cabinet - Enter<br\>
+	Exit game - Q<br\>
+	Release mouse - ESC<br\>
 `;
 
 const engagementDiv = document.createElement("div");
@@ -58,24 +60,53 @@ engagementDiv.addEventListener("click", async () => {
 	engagementDiv.style.display = "none";
 });
 
+// Show engagement div again when pointer lock is lost
+controls.addEventListener('unlock', () => {
+	// Only show engagement div if we're not in a game
+	if (!activeCabinet) {
+		engagementDiv.style.display = "block";
+	}
+});
+
 // Load cabinet models and create objects
 const loader = new GLTFLoader();
 
 let cabinets = [];
 
-//cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF"));
-cabinets.push(new Cabinet(0, "Neon Rancer", "#00FFFF", "neon-racer/src/game"));
-cabinets.push(new Cabinet(1, "Placeholder 1", "#00FF00", "neon-racer/src/game"));
-cabinets.push(new Cabinet(2, "Placeholder 2", "#FF0000", "neon-racer/src/game"));
+cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF", "tank-game/src/game"));
+cabinets.push(new Cabinet(1, "Neon Racer", "#00FFFF", "neon-racer/src/game"));
+cabinets.push(new Cabinet(2, "Placeholder 1", "#00FF00", "neon-racer/src/game"));
+cabinets.push(new Cabinet(3, "Placeholder 2", "#FF0000", "neon-racer/src/game"));
 
 const pressedKeys = new Set();
+let activeCabinet = null;
 
 document.addEventListener('keydown', (event) => {
-	pressedKeys.add(event.code);
+	// If a game is active, only track Q key for arcade (to exit game)
+	if (activeCabinet) {
+		if (event.code === 'KeyQ') {
+			pressedKeys.add(event.code);
+		}
+		// Forward all keys to the active game
+		activeCabinet.handleKeyDown(event);
+	} else {
+		// Normal arcade controls
+		pressedKeys.add(event.code);
+	}
 });
 
 document.addEventListener('keyup', (event) => {
-	pressedKeys.delete(event.code);
+	// If a game is active, only track Q key for arcade (to exit game)
+	if (activeCabinet) {
+		if (event.code === 'KeyQ') {
+			pressedKeys.delete(event.code);
+		}
+		// Forward all keys to the active game
+		activeCabinet.handleKeyUp(event);
+	} else {
+		// Normal arcade controls
+		pressedKeys.delete(event.code);
+	}
 });
 
 loader.load(cabinetModelFile, async function ( cabinetModel ) {
@@ -91,13 +122,36 @@ loader.load(cabinetModelFile, async function ( cabinetModel ) {
 
 
 function animate() {
-	camera.update(pressedKeys);
+	// Only update camera if no game is active
+	if (!activeCabinet) {
+		camera.update(pressedKeys);
+	}
 	//controls.update();
 
 	let startKeyPressed = pressedKeys.has("Enter")
 
+	// Check for Q key to exit game
+	if (pressedKeys.has("KeyQ") && activeCabinet) {
+		activeCabinet.deactivate();
+		activeCabinet = null;
+		camera.locked = false;
+		// Keep engagement div hidden if pointer lock is still active
+		if (document.pointerLockElement) {
+			engagementDiv.style.display = "none";
+		}
+	}
+
 	for (const cabinet of cabinets) {
 		cabinet.update(camera, startKeyPressed);
+		
+		// Set active cabinet when a game starts
+		if (cabinet.gameActive && activeCabinet !== cabinet) {
+			// Deactivate previous cabinet if any
+			if (activeCabinet) {
+				activeCabinet.deactivate();
+			}
+			activeCabinet = cabinet;
+		}
 	}
 
 	renderer.render( scene, camera.threeCamera );

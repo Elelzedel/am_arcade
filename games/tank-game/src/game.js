@@ -5,20 +5,22 @@ import { calculateWind } from './utils/physics.js';
 import TankBot from './ai/bot.js';
 
 export default class TankGame {
-    constructor(gameMode = 'selfplay', difficulty = 'medium', subCanvas = null) {
-        this.gameMode = gameMode; // 'multiplayer', 'singleplayer', 'selfplay'
-        this.difficulty = difficulty;
-
-		if (subCanvas == null) {
-			console.log("Running standalone");
-			this.canvas = document.getElementById('gameCanvas');
-		} else {
-			console.log("Running as arcade game");
-			this.arcadeMode = true;
-			this.canvas = subCanvas;
-			console.log(this.canvas);
-			console.log(this.canvas.getContext('2d'));
-		}
+    constructor(gameModeOrCanvas = 'selfplay', difficulty = 'medium', subCanvas = null) {
+        // Check if first parameter is a canvas (arcade mode)
+        if (gameModeOrCanvas && typeof gameModeOrCanvas === 'object' && gameModeOrCanvas.getContext) {
+            console.log("Running as arcade game");
+            this.arcadeMode = true;
+            this.canvas = gameModeOrCanvas;
+            this.gameMode = 'selfplay';
+            this.difficulty = 'medium';
+        } else {
+            // Standalone mode with gameMode and difficulty parameters
+            console.log("Running standalone");
+            this.gameMode = gameModeOrCanvas;
+            this.difficulty = difficulty;
+            this.arcadeMode = false;
+            this.canvas = document.getElementById('gameCanvas');
+        }
 
         this.ctx = this.canvas.getContext('2d');
         this.width = this.canvas.width;
@@ -60,7 +62,6 @@ export default class TankGame {
         this.positionTanks();
         this.updatePlayerNames();
         this.updateUI();
-        this.gameLoop();
     }
     
     initEventListeners() {
@@ -317,6 +318,41 @@ export default class TankGame {
         }
     }
     
+    start() {
+        console.log('Starting tank game...');
+        
+        // In arcade mode, input is handled by the cabinet
+        if (!this.arcadeMode) {
+            // Only add event listeners in standalone mode
+            if (this.initEventListeners) {
+                this.initEventListeners();
+            }
+        }
+        
+        this.gameLoop();
+    }
+    
+    drawArcadeInstructions() {
+        this.ctx.save();
+        
+        // Semi-transparent background for instructions
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, 10, 280, 100);
+        
+        // Instructions text
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '16px Arial';
+        this.ctx.fillText('Arrow Keys: Aim/Power', 20, 35);
+        this.ctx.fillText('Space: Fire', 20, 55);
+        this.ctx.fillText('Q: Exit to Arcade', 20, 75);
+        
+        // Current player turn
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = this.currentPlayer === 0 ? '#ff6b6b' : '#5ac8fa';
+        this.ctx.fillText(`Player ${this.currentPlayer + 1}'s Turn`, 20, 95);
+        
+        this.ctx.restore();
+    }
     
     gameLoop() {
         const deltaTime = 1/60;
@@ -337,6 +373,11 @@ export default class TankGame {
         
         if (this.gameState === 'aiming') {
             this.renderer.drawCurrentPlayerIndicator(this.players[this.currentPlayer]);
+        }
+        
+        // Draw arcade mode instructions
+        if (this.arcadeMode) {
+            this.drawArcadeInstructions();
         }
         
         requestAnimationFrame(() => this.gameLoop());
