@@ -91,6 +91,16 @@ export default class TankGame {
     }
     
     handleKeyDown(e) {
+        // Handle game over state
+        if (this.gameState === 'gameover' && this.arcadeMode) {
+            if (e.key === ' ') {
+                e.preventDefault();
+                this.restartGame();
+                return;
+            }
+            return;
+        }
+        
         if (this.gameState !== 'aiming') return;
         
         // Prevent input during bot's turn
@@ -162,13 +172,22 @@ export default class TankGame {
     }
     
     updateProjectiles(deltaTime) {
+        // Don't update projectiles if game is over
+        if (this.gameState === 'gameover') {
+            this.projectiles = [];
+            return;
+        }
+        
         this.projectiles = this.projectiles.filter(projectile => {
             projectile.update(deltaTime, this.wind);
 
             // 1. Check for tank hits
             if (this.checkTankHits(projectile.x, projectile.y)) {
                 this.terrain.createCrater(projectile.x, 30); // Crater on hit
-                this.endTurn();
+                // Don't end turn if game is now over
+                if (this.gameState !== 'gameover') {
+                    this.endTurn();
+                }
                 return false; // Remove projectile
             }
             
@@ -221,6 +240,7 @@ export default class TankGame {
                 hitOccurred = true;
                 
                 if (tank.lives <= 0) {
+                    console.log(`Player ${tank.player} defeated! Lives: ${tank.lives}`);
                     this.gameOver(tank.player === 1 ? 2 : 1);
                 }
             }
@@ -229,6 +249,11 @@ export default class TankGame {
     }
     
     async endTurn() {
+        // Don't process turn changes if game is over
+        if (this.gameState === 'gameover') {
+            return;
+        }
+        
         this.gameState = 'aiming';
         this.currentPlayer = (this.currentPlayer + 1) % 2;
         this.resetWind();
@@ -249,13 +274,16 @@ export default class TankGame {
     
     gameOver(winner) {
         this.gameState = 'gameover';
+        this.winner = winner;
         
-        const victoryScreen = document.getElementById('victoryScreen');
-        const victoryMessage = document.getElementById('victoryMessage');
-        
-        if (victoryScreen && victoryMessage) {
-            victoryMessage.textContent = `Player ${winner} Wins!`;
-            victoryScreen.style.display = 'flex';
+        if (!this.arcadeMode) {
+            const victoryScreen = document.getElementById('victoryScreen');
+            const victoryMessage = document.getElementById('victoryMessage');
+            
+            if (victoryScreen && victoryMessage) {
+                victoryMessage.textContent = `Player ${winner} Wins!`;
+                victoryScreen.style.display = 'flex';
+            }
         }
     }
     
@@ -332,6 +360,38 @@ export default class TankGame {
         this.gameLoop();
     }
     
+    restartGame() {
+        // Reset game state
+        this.gameState = 'aiming';
+        this.currentPlayer = 0;
+        this.projectiles = [];
+        this.winner = null;
+        
+        // Reset player health and positions
+        this.players[0].lives = 3;
+        this.players[1].lives = 3;
+        this.players[0].x = 150;
+        this.players[1].x = this.width - 150;
+        this.players[0].angle = 45;
+        this.players[1].angle = 135;
+        this.players[0].power = 50;
+        this.players[1].power = 50;
+        
+        // Generate new terrain
+        const mapTypes = ['hills', 'jagged', 'valley', 'tower', 'flat', 'bridge'];
+        const randomMapType = mapTypes[Math.floor(Math.random() * mapTypes.length)];
+        this.terrain = new Terrain(this.width, this.height, randomMapType);
+        
+        // Reset scale for large maps
+        const largeMaps = ['bridge', 'jagged'];
+        this.scale = largeMaps.includes(randomMapType) ? 0.75 : 1.0;
+        
+        // Reset wind and position tanks
+        this.resetWind();
+        this.positionTanks();
+        this.updateUI();
+    }
+    
     drawArcadeInstructions() {
         this.ctx.save();
         
@@ -397,12 +457,14 @@ export default class TankGame {
         this.ctx.fillRect(p1X, barY, barWidth, barHeight);
         
         // Health fill
-        const p1HealthWidth = (this.players[0].lives / 3) * barWidth;
-        const gradient1 = this.ctx.createLinearGradient(p1X, barY, p1X + p1HealthWidth, barY);
-        gradient1.addColorStop(0, '#ff4444');
-        gradient1.addColorStop(1, '#ff6b6b');
-        this.ctx.fillStyle = gradient1;
-        this.ctx.fillRect(p1X, barY, p1HealthWidth, barHeight);
+        const p1HealthWidth = Math.max(0, (this.players[0].lives / 3) * barWidth);
+        if (p1HealthWidth > 0) {
+            const gradient1 = this.ctx.createLinearGradient(p1X, barY, p1X + p1HealthWidth, barY);
+            gradient1.addColorStop(0, '#ff4444');
+            gradient1.addColorStop(1, '#ff6b6b');
+            this.ctx.fillStyle = gradient1;
+            this.ctx.fillRect(p1X, barY, p1HealthWidth, barHeight);
+        }
         
         // Border
         this.ctx.strokeStyle = '#ffffff';
@@ -417,7 +479,8 @@ export default class TankGame {
         
         // Lives text
         this.ctx.textAlign = 'right';
-        this.ctx.fillText(`${this.players[0].lives}/3`, p1X + barWidth - 5, barY + 20);
+        const p1Lives = Math.max(0, this.players[0].lives);
+        this.ctx.fillText(`${p1Lives}/3`, p1X + barWidth - 5, barY + 20);
         
         // Player 2 health bar (right side)
         const p2X = this.width - barWidth - padding;
@@ -427,12 +490,14 @@ export default class TankGame {
         this.ctx.fillRect(p2X, barY, barWidth, barHeight);
         
         // Health fill
-        const p2HealthWidth = (this.players[1].lives / 3) * barWidth;
-        const gradient2 = this.ctx.createLinearGradient(p2X, barY, p2X + p2HealthWidth, barY);
-        gradient2.addColorStop(0, '#4488ff');
-        gradient2.addColorStop(1, '#5ac8fa');
-        this.ctx.fillStyle = gradient2;
-        this.ctx.fillRect(p2X, barY, p2HealthWidth, barHeight);
+        const p2HealthWidth = Math.max(0, (this.players[1].lives / 3) * barWidth);
+        if (p2HealthWidth > 0) {
+            const gradient2 = this.ctx.createLinearGradient(p2X, barY, p2X + p2HealthWidth, barY);
+            gradient2.addColorStop(0, '#4488ff');
+            gradient2.addColorStop(1, '#5ac8fa');
+            this.ctx.fillStyle = gradient2;
+            this.ctx.fillRect(p2X, barY, p2HealthWidth, barHeight);
+        }
         
         // Border
         this.ctx.strokeStyle = '#ffffff';
@@ -445,7 +510,8 @@ export default class TankGame {
         
         // Lives text
         this.ctx.textAlign = 'right';
-        this.ctx.fillText(`${this.players[1].lives}/3`, p2X + barWidth - 5, barY + 20);
+        const p2Lives = Math.max(0, this.players[1].lives);
+        this.ctx.fillText(`${p2Lives}/3`, p2X + barWidth - 5, barY + 20);
         
         this.ctx.restore();
     }
@@ -562,6 +628,65 @@ export default class TankGame {
         this.ctx.restore();
     }
     
+    drawVictoryScreen() {
+        this.ctx.save();
+        
+        // Dark overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Victory panel
+        const panelWidth = 600;
+        const panelHeight = 400;
+        const panelX = (this.width - panelWidth) / 2;
+        const panelY = (this.height - panelHeight) / 2;
+        
+        // Panel background
+        this.ctx.fillStyle = 'rgba(20, 20, 40, 0.95)';
+        this.ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Panel border
+        this.ctx.strokeStyle = this.winner === 1 ? '#ff6b6b' : '#5ac8fa';
+        this.ctx.lineWidth = 4;
+        this.ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+        
+        // Victory text
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('VICTORY!', this.width / 2, panelY + 80);
+        
+        // Winner text
+        this.ctx.fillStyle = this.winner === 1 ? '#ff6b6b' : '#5ac8fa';
+        this.ctx.font = 'bold 36px Arial';
+        this.ctx.fillText(`Player ${this.winner} Wins!`, this.width / 2, panelY + 140);
+        
+        // Final scores
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '24px Arial';
+        this.ctx.fillText('Final Score', this.width / 2, panelY + 200);
+        
+        // Player scores
+        this.ctx.font = '20px Arial';
+        this.ctx.textAlign = 'left';
+        const scoreX = panelX + 150;
+        
+        this.ctx.fillStyle = '#ff6b6b';
+        this.ctx.fillText(`Player 1: ${this.players[0].lives} lives remaining`, scoreX, panelY + 240);
+        
+        this.ctx.fillStyle = '#5ac8fa';
+        this.ctx.fillText(`Player 2: ${this.players[1].lives} lives remaining`, scoreX, panelY + 270);
+        
+        // Instructions
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 20px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Press SPACE to play again', this.width / 2, panelY + 340);
+        this.ctx.fillText('Press Q to exit to arcade', this.width / 2, panelY + 370);
+        
+        this.ctx.restore();
+    }
+    
     gameLoop() {
         const deltaTime = 1/60;
         
@@ -587,6 +712,11 @@ export default class TankGame {
         if (this.arcadeMode) {
             this.drawArcadeUI();
             this.drawArcadeInstructions();
+            
+            // Draw victory screen if game is over
+            if (this.gameState === 'gameover') {
+                this.drawVictoryScreen();
+            }
         }
         
         requestAnimationFrame(() => this.gameLoop());
