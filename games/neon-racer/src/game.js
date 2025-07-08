@@ -6,8 +6,15 @@ import { HUD } from './ui/hud.js';
 import { Starfield } from './world/starfield.js';
 
 class Game {
-    constructor() {
-        this.canvas = document.getElementById('gameCanvas');
+    constructor(subCanvas = null) {
+		if (subCanvas == null) {
+			this.canvas = document.getElementById('gameCanvas');
+			this.arcadeMode = false;
+		} else {
+			this.canvas = subCanvas;
+			this.arcadeMode = true;
+		}
+
         if (!this.canvas) {
             console.error('Canvas element not found!');
             return;
@@ -128,12 +135,16 @@ class Game {
     
     pause() {
         this.isPaused = true;
-        document.getElementById('pauseMenu').style.display = 'flex';
+		if (this.arcadeMode != true) {
+			document.getElementById('pauseMenu').style.display = 'flex';
+		}
     }
     
     resume() {
         this.isPaused = false;
-        document.getElementById('pauseMenu').style.display = 'none';
+		if (this.arcadeMode != true) {
+			document.getElementById('pauseMenu').style.display = 'none';
+		}
         this.lastTime = performance.now();
         this.animate();
     }
@@ -251,7 +262,9 @@ class Game {
         document.getElementById('finalSpeed').textContent = `${Math.floor(this.speed)} km/h`;
         
         // Show game over screen
-        document.getElementById('gameOverScreen').style.display = 'flex';
+		if (this.arcadeMode != true) {
+			document.getElementById('gameOverScreen').style.display = 'flex';
+		}
     }
     
     dispose() {
