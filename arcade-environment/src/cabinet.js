@@ -20,6 +20,7 @@ export default class Cabinet {
 		subCanvas.width = 1024;
 		subCanvas.height = 576;
 
+		// TODO: This screen should be in the cabinet gLTF instead to avoid all these magic numbers
 		const screenGeometry = new THREE.PlaneGeometry( 0.7, 0.6 );
 
 		this.subCanvasTexture = new THREE.CanvasTexture(subCanvas);
@@ -127,28 +128,50 @@ export default class Cabinet {
 	}
 
 	async addNamePlate(scene) {
-		const namePlateCanvas = document.createElement('canvas');
-		namePlateCanvas.width = 500;
-		namePlateCanvas.height = 100;
+		let plateFont = new FontFace(
+			"PlateFont",
+			"url(https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2)"
+		);
 
-		const namePlateCanvasCtx = namePlateCanvas.getContext('2d');
+		plateFont.load().then((plateFont) => {
+			console.log("PlateFont loaded");
+			document.fonts.add(plateFont);
 
-		namePlateCanvasCtx.font = "50px serif";
-		namePlateCanvasCtx.textAlign = "center";
-		namePlateCanvasCtx.fillStyle = this.color;
-		namePlateCanvasCtx.fillText(this.name, 250, 50);
+			const namePlateCanvas = document.createElement('canvas');
+			namePlateCanvas.width = 500;
+			namePlateCanvas.height = 100;
 
-		const namePlateTexture = new THREE.CanvasTexture(namePlateCanvas);
-		const namePlateMaterial = new THREE.MeshPhongMaterial({map: namePlateTexture, transparent: true})
+			const namePlateCanvasCtx = namePlateCanvas.getContext('2d');
 
-		const namePlateGeometry = new THREE.PlaneGeometry( 1, 0.2 );
-		const namePlate = new THREE.Mesh( namePlateGeometry, namePlateMaterial );
+			namePlateCanvasCtx.font = "30px PlateFont";
+			namePlateCanvasCtx.textAlign = "center";
+			namePlateCanvasCtx.fillStyle = this.color;
+			namePlateCanvasCtx.fillText(this.name, 250, 50);
 
-		namePlate.rotation.y = Math.PI/2;
-		namePlate.position.x = -3.98;
-		namePlate.position.y = 1.771;
-		namePlate.position.z = this.offsetZ;
+			const namePlateTexture = new THREE.CanvasTexture(namePlateCanvas);
+			const namePlateMaterial = new THREE.MeshPhongMaterial({map: namePlateTexture, transparent: true})
 
-		scene.add(namePlate);
+			// TODO: This geometry should be in the cabinet gLTF instead to avoid all these magic numbers
+			let namePlateGeometry = new THREE.PlaneGeometry( 1, 0.2 );
+			let namePlate = new THREE.Mesh( namePlateGeometry, namePlateMaterial );
+
+			namePlate.rotation.y = Math.PI/2;
+			namePlate.position.x = -3.98;
+			namePlate.position.y = 1.771;
+			namePlate.position.z = this.offsetZ;
+
+			scene.add(namePlate.clone());
+
+			namePlateGeometry = new THREE.PlaneGeometry( 2, 0.4 );
+			namePlate = new THREE.Mesh( namePlateGeometry, namePlateMaterial );
+
+			namePlate.rotation.y = 0;
+			namePlate.rotation.z = -1.4;
+			namePlate.position.x = -4.43;
+			namePlate.position.y = 0.8;
+			namePlate.position.z = this.offsetZ+0.5;
+
+			scene.add(namePlate);
+		});
 	}
 }

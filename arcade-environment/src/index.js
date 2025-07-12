@@ -13,9 +13,12 @@ window.arcadeMode = true;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0x111111 );
 
-const light = new THREE.PointLight( 0xFFFFFF, 50 );
-light.position.set(0, 10, 0);
-scene.add(light);
+const ambLight = new THREE.AmbientLight( 0x545454 );
+scene.add(ambLight);
+
+const pointLight = new THREE.PointLight( 0xFFFFFF, 50 );
+pointLight.position.set(0, 10, 0);
+scene.add(pointLight);
 
 const renderer = new THREE.WebGLRenderer();
 
@@ -36,8 +39,8 @@ let cabinets = [];
 
 cabinets.push(new Cabinet(0, "Tank Game", "#FF00FF", "tank-game/src/game"));
 cabinets.push(new Cabinet(1, "Neon Racer", "#00FFFF", "neon-racer/src/game"));
-cabinets.push(new Cabinet(2, "Placeholder 1", "#00FF00", "neon-racer/src/game"));
-cabinets.push(new Cabinet(3, "Placeholder 2", "#FF0000", "neon-racer/src/game"));
+cabinets.push(new Cabinet(2, "Placeholder", "#00FF00", "neon-racer/src/game"));
+cabinets.push(new Cabinet(3, "Placeholder", "#FF0000", "neon-racer/src/game"));
 
 const pressedKeys = new Set();
 
