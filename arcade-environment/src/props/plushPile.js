@@ -62,6 +62,7 @@ export class PlushPile {
         const i = this.bodies.indexOf(body);
         if (i >= 0) this.bodies.splice(i, 1);
         this.parent.remove(body.mesh);
+        this.wakeAll(); // Removing a support must wake the prizes resting on it.
     }
 
     wake(body) {
@@ -112,15 +113,18 @@ export class PlushPile {
     nearest(x, z, radius, y = null, maxDy = Infinity) {
         let best = null;
         let bestDist = Infinity;
+        let bestSurface = -Infinity;
         for (const body of this.bodies) {
             if (body.held || body.falling) continue;
             if (y !== null && Math.abs(body.pos.y - y) > maxDy) continue;
             const dx = body.pos.x - x;
             const dz = body.pos.z - z;
             const dist = Math.hypot(dx, dz);
-            if (dist <= radius && dist < bestDist) {
+            const surface = body.pos.y + body.radius - dist * .35;
+            if (dist <= radius && surface > bestSurface) {
                 best = body;
                 bestDist = dist;
+                bestSurface = surface;
             }
         }
         if (!best) return null;
@@ -145,20 +149,21 @@ export class PlushPile {
     }
 
     // Highest plush surface under a point, for parking the claw and the sight ring.
-    surfaceHeight(x, z, radius = 0.09) {
+    surfaceHeight(x, z, radius = 0.025) {
         let top = this.bounds.floorY;
         for (const body of this.bodies) {
             if (body.held) continue;
             const dx = body.pos.x - x;
             const dz = body.pos.z - z;
-            if (dx * dx + dz * dz > radius * radius) continue;
-            top = Math.max(top, body.pos.y + body.radius * 0.6);
+            const d2 = dx * dx + dz * dz;
+            if (d2 > (body.radius + radius) ** 2) continue;
+            top = Math.max(top, body.pos.y + Math.sqrt(Math.max(0, body.radius ** 2 - d2)));
         }
         return top;
     }
 
     update(dt) {
-        this.accumulator = Math.min(this.accumulator + dt, STEP * 4);
+        this.accumulator = Math.min(this.accumulator + dt, STEP * 12);
         while (this.accumulator >= STEP) {
             this.accumulator -= STEP;
             this.step(STEP);
@@ -167,102 +172,75 @@ export class PlushPile {
     }
 
     step(dt) {
-        const b = this.bounds;
-        const bodies = this.bodies;
-
-        for (const body of bodies) {
-            if (body.held) continue;
-            if (body.asleep) continue;
-
-            body.vel.y -= GRAVITY * dt;
-            body.pos.addScaledVector(body.vel, dt);
-
-            // Side walls: the glass is absolute.
-            const r = body.radius;
-            if (body.pos.x < b.minX + r) { body.pos.x = b.minX + r; body.vel.x = Math.abs(body.vel.x) * 0.3; }
-            if (body.pos.x > b.maxX - r) { body.pos.x = b.maxX - r; body.vel.x = -Math.abs(body.vel.x) * 0.3; }
-            if (body.pos.z < b.minZ + r) { body.pos.z = b.minZ + r; body.vel.z = Math.abs(body.vel.z) * 0.3; }
-            if (body.pos.z > b.maxZ - r) { body.pos.z = b.maxZ - r; body.vel.z = -Math.abs(body.vel.z) * 0.3; }
-            if (body.pos.y > b.topY - r) { body.pos.y = b.topY - r; body.vel.y = Math.min(0, body.vel.y); }
-
-            const overHole = Math.hypot(body.pos.x - this.hole.x, body.pos.z - this.hole.z) < this.hole.radius;
-            if (overHole) {
-                body.falling = true;
-                if (body.pos.y < b.floorY - 0.45) {
-                    if (this.onFall) this.onFall(body);
-                    continue;
-                }
-            } else {
-                body.falling = false;
-                const rest = b.floorY + r * 0.92;
-                if (body.pos.y < rest) {
-                    const impact = -body.vel.y;
-                    body.pos.y = rest;
-                    body.vel.y = impact > 0.35 ? impact * BOUNCE : 0;
-                    const damp = Math.max(0, 1 - FRICTION * dt);
-                    body.vel.x *= damp;
-                    body.vel.z *= damp;
-                    if (impact > 0.9 && this.onThud) this.onThud(impact);
-                }
+        const bounds = this.bounds;
+        const overChute = body => Math.hypot(body.pos.x-this.hole.x, body.pos.z-this.hole.z)
+            < this.hole.radius - body.radius * .25;
+        const constrain = body => {
+            const r=body.radius;
+            for (const [axis,min,max] of [['x',bounds.minX+r,bounds.maxX-r],['z',bounds.minZ+r,bounds.maxZ-r]]) {
+                if(body.pos[axis]<min){body.pos[axis]=min;body.vel[axis]=Math.max(0,body.vel[axis])*.2;}
+                if(body.pos[axis]>max){body.pos[axis]=max;body.vel[axis]=Math.min(0,body.vel[axis])*.2;}
             }
-
-            body.spin *= Math.max(0, 1 - 3 * dt);
-            body.yaw += body.spin * dt;
-        }
-
-        // Separation. Sleeping neighbours only move if something lively hits them.
-        for (let i = 0; i < bodies.length; i++) {
-            const a = bodies[i];
-            if (a.held) continue;
-            for (let j = i + 1; j < bodies.length; j++) {
-                const c = bodies[j];
-                if (c.held) continue;
-                if (a.asleep && c.asleep) continue;
-                const dx = c.pos.x - a.pos.x;
-                const dy = c.pos.y - a.pos.y;
-                const dz = c.pos.z - a.pos.z;
-                // Plushes squash together a little, which keeps piles from looking like marbles.
-                const minDist = (a.radius + c.radius) * 0.88;
-                const distSq = dx * dx + dy * dy + dz * dz;
-                if (distSq > minDist * minDist) continue;
-                const dist = Math.sqrt(distSq) || 1e-4;
-                const overlap = (minDist - dist) * 0.5;
-                tmp.set(dx / dist, dy / dist, dz / dist);
-                const aShare = c.asleep ? 1 : 0.5;
-                const cShare = a.asleep ? 1 : 0.5;
-                if (!a.asleep) {
-                    a.pos.addScaledVector(tmp, -overlap * 2 * aShare);
-                    a.vel.addScaledVector(tmp, -overlap * 9);
-                }
-                if (!c.asleep) {
-                    c.pos.addScaledVector(tmp, overlap * 2 * cShare);
-                    c.vel.addScaledVector(tmp, overlap * 9);
-                }
-                // A noticeably fast hit wakes a sleeper; a nudge does not.
-                if (a.asleep && c.vel.lengthSq() > 0.05) this.wake(a);
-                if (c.asleep && a.vel.lengthSq() > 0.05) this.wake(c);
+            if(body.pos.y>bounds.topY-r){body.pos.y=bounds.topY-r;body.vel.y=Math.min(0,body.vel.y);}
+            if(body.falling) return;
+            if(overChute(body)) {
+                if(body.pos.y < bounds.floorY+r) body.falling=true;
+                return;
             }
-        }
-
-        for (const body of bodies) {
-            if (body.held || body.asleep) continue;
-            // Safety net: whatever the maths did, stay inside the glass.
-            body.pos.x = THREE.MathUtils.clamp(body.pos.x, b.minX, b.maxX);
-            body.pos.z = THREE.MathUtils.clamp(body.pos.z, b.minZ, b.maxZ);
-            body.pos.y = Math.min(body.pos.y, b.topY);
-            if (body.pos.y < b.floorY - 0.6) body.pos.y = b.floorY - 0.6;
-
-            if (body.vel.lengthSq() < SLEEP_SPEED * SLEEP_SPEED && !body.falling) {
-                body.calm += dt;
-                if (body.calm > SLEEP_TIME) {
-                    body.asleep = true;
-                    body.vel.set(0, 0, 0);
-                    body.spin = 0;
-                }
-            } else {
-                body.calm = 0;
+            const rest=bounds.floorY+r;
+            if(body.pos.y<=rest+.001) {
+                const impact=Math.max(0,-body.vel.y);
+                body.pos.y=Math.max(body.pos.y,rest);body.supported=true;
+                body.vel.y=impact>.35?impact*BOUNCE:Math.max(0,body.vel.y);
+                body.vel.x*=Math.exp(-FRICTION*dt);body.vel.z*=Math.exp(-FRICTION*dt);
+                if(impact>.9&&this.onThud)this.onThud(impact);
             }
+        };
+        for(const body of this.bodies) {
+            body.supported=false;
+            if(body.held||body.asleep)continue;
+            body.vel.y-=GRAVITY*dt;
+            body.pos.addScaledVector(body.vel,dt);
+            body.spin*=Math.exp(-3*dt);body.yaw+=body.spin*dt;
+            if(body.falling){body.vel.x*=Math.exp(-12*dt);body.vel.z*=Math.exp(-12*dt);}
+            constrain(body);
         }
+        // Iterative contact correction removes closing velocity instead of
+        // adding energy for penetration. This lets a stack actually settle.
+        for(let iteration=0;iteration<4;iteration++) {
+            for(let i=0;i<this.bodies.length;i++)for(let j=i+1;j<this.bodies.length;j++) {
+                const a=this.bodies[i], b=this.bodies[j];
+                if(a.held||b.held||a.falling||b.falling||(a.asleep&&b.asleep))continue;
+                tmp.copy(b.pos).sub(a.pos);
+                const dist=tmp.length(), separation=(a.radius+b.radius)*.94;
+                if(dist>separation+.001)continue;
+                if(dist<1e-8)tmp.set((i+j)%2?1:-1,.25,.15).normalize();else tmp.multiplyScalar(1/dist);
+                const relative=(b.vel.x-a.vel.x)*tmp.x+(b.vel.y-a.vel.y)*tmp.y+(b.vel.z-a.vel.z)*tmp.z;
+                if(a.asleep&&relative<-.12)this.wake(a);
+                if(b.asleep&&relative<-.12)this.wake(b);
+                const wa=a.asleep?0:1, wb=b.asleep?0:1, total=wa+wb;
+                if(!total)continue;
+                const correction=Math.max(0,separation-dist-.0003)/total;
+                a.pos.addScaledVector(tmp,-correction*wa);b.pos.addScaledVector(tmp,correction*wb);
+                if(relative<0){const impulse=-relative/total;a.vel.addScaledVector(tmp,-impulse*wa);b.vel.addScaledVector(tmp,impulse*wb);}
+                if(tmp.y>.35)b.supported=true;
+                if(tmp.y<-.35)a.supported=true;
+                // Tangential damping models cloth rubbing against cloth.
+                for(const body of [a,b])if(!body.asleep){body.vel.x*=.97;body.vel.z*=.97;}
+            }
+            for(const body of this.bodies)if(!body.held&&!body.asleep)constrain(body);
+        }
+        const delivered=[];
+        for(const body of this.bodies) {
+            if(body.held||body.asleep)continue;
+            if(body.falling&&body.pos.y<bounds.floorY-.45){delivered.push(body);continue;}
+            if(body.supported&&!body.falling&&body.vel.lengthSq()<SLEEP_SPEED*SLEEP_SPEED){
+                body.calm+=dt;
+                if(body.calm>SLEEP_TIME){body.asleep=true;body.vel.set(0,0,0);body.spin=0;}
+            }else body.calm=0;
+        }
+        // Deliver after iteration; onFall removes bodies and may wake supports.
+        for(const body of delivered) { if(this.onFall)this.onFall(body);else this.remove(body); }
     }
 
     syncMesh(body) {

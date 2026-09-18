@@ -329,6 +329,10 @@ export default class NeonSnake extends ArcadeGame {
         const head = this.body[0];
         let nx = head.x + DX[this.dir];
         let ny = head.y + DY[this.dir];
+        if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
+            this.crash();
+            return;
+        }
         let pin = null;
         let ni = ny * COLS + nx;
         const warp = this.portalMap[ni];

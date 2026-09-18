@@ -15,7 +15,7 @@ const H = 600;
 const PLAYER_HOME_Y = 536;
 const PLAYER_MIN_Y = 488;
 const PLAYER_MAX_Y = 548;
-const PLAYER_RADIUS = 7;
+const PLAYER_RADIUS = 12; // central hull; decorative wing tips remain forgiving
 const PLAYER_SPEED = 340;
 const FORM_TOP = 112;
 const COL_SPACING = 50;
@@ -40,6 +40,16 @@ const CAPSULE_INFO = {
 const CAPSULE_TYPES = Object.keys(CAPSULE_INFO);
 
 const tmp = { x: 0, y: 0, heading: 0 };
+
+// Relative swept collision catches a projectile crossing the ship between
+// rendered frames, including when ship and projectile move toward each other.
+function crossesShip(x0, y0, x1, y1, player, radius) {
+    const ax = x0 - (player.prevX ?? player.x), ay = y0 - (player.prevY ?? player.y);
+    const bx = x1 - player.x, by = y1 - player.y;
+    const dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
+    return (ax + dx * t) ** 2 + (ay + dy * t) ** 2 <= radius * radius;
+}
 
 export default class StarSwarm extends ArcadeGame {
     static meta = {
@@ -98,7 +108,7 @@ export default class StarSwarm extends ArcadeGame {
         this.player = {
             x: 400, y: PLAYER_HOME_Y, vx: 0, alive: true, invuln: 0,
             fireCooldown: 0, weapon: 'normal', weaponTime: 0, shieldTime: 0,
-            respawnTimer: 0, readyShown: false, tilt: 0,
+            respawnTimer: 0, respawnWait: 0, readyShown: false, tilt: 0,
         };
         this.fireQueued = false;
         this.pilot.reset();
@@ -706,9 +716,10 @@ export default class StarSwarm extends ArcadeGame {
             return;
         }
         p.respawnTimer -= dt;
+        p.respawnWait += dt;
         // Wait for the sky to calm down before respawning.
         const busy = this.enemies.some((e) => e.state === 'diving' && !e.minion);
-        if (busy && p.respawnTimer < 1.3 && p.respawnTimer > -3) {
+        if (busy && p.respawnTimer < 1.3 && p.respawnWait < 6) {
             p.respawnTimer = Math.max(p.respawnTimer, 1.3);
             return;
         }
@@ -721,6 +732,7 @@ export default class StarSwarm extends ArcadeGame {
             p.x = 400;
             p.y = PLAYER_HOME_Y;
             p.vx = 0;
+            p.prevX = p.x; p.prevY = p.y;
             p.invuln = 2.6;
             p.fireCooldown = 0.3;
             this.clearEnemyBullets(false);
@@ -743,6 +755,7 @@ export default class StarSwarm extends ArcadeGame {
         p.alive = false;
         p.readyShown = false;
         p.respawnTimer = 3.2;
+        p.respawnWait = 0;
         p.weapon = 'normal';
         p.weaponTime = 0;
         p.shieldTime = 0;
@@ -825,19 +838,17 @@ export default class StarSwarm extends ArcadeGame {
         });
 
         const p = this.player;
-        const canHit = p.alive && p.invuln <= 0;
         compact(this.enemyBullets, (b) => {
+            const oldX = b.x, oldY = b.y;
             b.x += b.vx * dt;
             b.y += b.vy * dt;
             if (b.y > H + 20 || b.y < -40 || b.x < -30 || b.x > W + 30) {
                 this.bulletPool.push(b);
                 return false;
             }
-            if (canHit && p.alive) {
-                const dx = b.x - p.x;
-                const dy = b.y - p.y;
+            if (p.alive && p.invuln <= 0) {
                 const r = PLAYER_RADIUS + (b.big ? 6 : 4) + (p.shieldTime > 0 ? 12 : 0);
-                if (dx * dx + dy * dy < r * r) {
+                if (crossesShip(oldX, oldY, b.x, b.y, p, r)) {
                     this.hitPlayer();
                     this.bulletPool.push(b);
                     return false;
@@ -852,10 +863,8 @@ export default class StarSwarm extends ArcadeGame {
                 if (e.state !== 'diving' && e.state !== 'joining' && e.state !== 'entering') continue;
                 // Challenge-stage fly-bys are harmless (their paths sweep the player's row).
                 if (e.challenge) continue;
-                const dx = e.x - p.x;
-                const dy = e.y - p.y;
                 const r = PLAYER_RADIUS + e.def.radius - 2 + (p.shieldTime > 0 ? 10 : 0);
-                if (dx * dx + dy * dy < r * r) {
+                if (crossesShip(e.px, e.py, e.x, e.y, p, r)) {
                     e.hp = 1;
                     this.killEnemy(e, false);
                     this.hitPlayer();
@@ -949,6 +958,7 @@ export default class StarSwarm extends ArcadeGame {
         this.updateFormation(dt);
         this.updateSpawning(dt);
         this.updateDiving(dt);
+        this.player.prevX = this.player.x; this.player.prevY = this.player.y;
         this.updatePlayer(dt);
         this.updateEnemies(dt);
         if (this.boss && !this.boss.done) this.boss.update(this, dt);

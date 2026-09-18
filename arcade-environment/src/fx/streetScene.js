@@ -216,8 +216,7 @@ export function createStreetScene() {
         const h=10+random()*16;
         box(4+random()*3,h,5,surface('#202e3b'),-38+i*5.5,h/2,-40-random()*8);
     }
-    const sky=mesh(new THREE.PlaneGeometry(130,65),new THREE.MeshBasicMaterial({color:0x101b29,fog:false}),0,22,-53);
-    sky.name='distant-sky';
+
 
     const carUniform={value:new THREE.Vector4(0,-4.8,0,1)};
     const roadMaterial=new THREE.ShaderMaterial({

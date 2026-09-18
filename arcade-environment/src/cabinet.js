@@ -11,7 +11,6 @@ const SCREEN_CENTER = new THREE.Vector3(0, 1.335, 0.555);
 const SCREEN_TILT = -0.384; // top of the tube leans back ~22°
 const SCREEN_WIDTH = 0.67;
 const SCREEN_HEIGHT = 0.505;
-const PANEL_TOP_Y = 0.955;
 const FRONT_Z = 0.77;
 export const CABINET_DEPTH = 1.27;
 export const CABINET_HALF_WIDTH = 0.43;
@@ -307,36 +306,58 @@ export default class Cabinet {
     }
 
     buildControls() {
-        const dark = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
-        const ball = new THREE.MeshStandardMaterial({ color: 0xe0203a, roughness: 0.25, metalness: 0.1 });
-        const panelZ = 1.02;
-
-        const base = new THREE.Mesh(geometry('stickBase', () => new THREE.CylinderGeometry(0.035, 0.04, 0.012, 20)), dark);
-        base.position.set(-0.17, PANEL_TOP_Y + 0.006, panelZ);
-        this.group.add(base);
-
-        this.stickPivot = new THREE.Group();
-        this.stickPivot.position.set(-0.17, PANEL_TOP_Y, panelZ);
-        const shaft = new THREE.Mesh(geometry('stickShaft', () => new THREE.CylinderGeometry(0.007, 0.007, 0.08, 8)), dark);
-        shaft.position.y = 0.04;
-        const top = new THREE.Mesh(geometry('stickBall', () => new THREE.SphereGeometry(0.025, 16, 12)), ball);
-        top.position.y = 0.09;
-        this.stickPivot.add(shaft, top);
-        this.group.add(this.stickPivot);
-
-        const buttonColors = [this.color, '#ffe066', '#ffffff'];
-        this.buttons = buttonColors.map((c, i) => {
-            const mat = new THREE.MeshStandardMaterial({
-                color: c,
-                emissive: new THREE.Color(c),
-                emissiveIntensity: this.broken ? 0 : 0.25,
-                roughness: 0.3,
-            });
-            const button = new THREE.Mesh(geometry('button', () => new THREE.CylinderGeometry(0.02, 0.02, 0.018, 20)), mat);
-            button.position.set(0.02 + i * 0.075, PANEL_TOP_Y + 0.009, panelZ + (i === 1 ? -0.03 : 0.01));
-            this.group.add(button);
-            return button;
-        });
+        // Match the actual sloping deck in the glTF (1.0359m at z=.77,
+        // .9535m at z=1.268). The old buttons were buried under this surface.
+        const panel = new THREE.Group();
+        panel.name = 'control-panel';
+        panel.position.set(0, 1.001, 1.0);
+        panel.rotation.x = Math.atan2(.0824, .498);
+        this.group.add(panel);
+        this.controlPanel = panel;
+        this.controlKeys = new Set();
+        const dark = new THREE.MeshStandardMaterial({ color: 0x16191e, roughness: .38 });
+        const chrome = new THREE.MeshStandardMaterial({ color: 0xa2a5a7, roughness: .28, metalness: .7 });
+        const action = { 'tank-artillery': 'FIRE', 'star-swarm': 'FIRE', 'neon-racer': 'BOOST',
+            'brick-blitz': 'LAUNCH', 'neon-snake': 'DASH' }[this.meta.id] || 'PLAY';
+        const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#141821'; ctx.fillRect(0,0,1024,512);
+        ctx.strokeStyle = this.color; ctx.lineWidth = 5; ctx.strokeRect(12,12,1000,488);
+        ctx.globalAlpha = .24;
+        for(let i=0;i<1024;i+=20) { ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i-200,512);ctx.stroke(); }
+        ctx.globalAlpha = 1; ctx.textAlign = 'center'; ctx.fillStyle = '#bbbcc4'; ctx.font = 'bold 21px sans-serif';
+        const label=(text,x,z)=>ctx.fillText(text,(x/.78+.5)*1024,(z/.42+.5)*512);
+        label('START',-.28,-.12); label('PAUSE',-.15,-.12); label(action,.05,.12);
+        label('MOVE',-.24,.14);
+        const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+        const plate = new THREE.Mesh(new THREE.PlaneGeometry(.78,.42),new THREE.MeshStandardMaterial({map:texture,roughness:.52}));
+        plate.rotation.x = -Math.PI/2; plate.position.y = .002; panel.add(plate);
+        const base = new THREE.Mesh(geometry('stickBase',()=>new THREE.CylinderGeometry(.045,.045,.01,24)),dark);
+        base.position.set(-.24,.009,.025); panel.add(base);
+        this.stickPivot = new THREE.Group(); this.stickPivot.position.set(-.24,.01,.025);
+        const shaft = new THREE.Mesh(geometry('stickShaft',()=>new THREE.CylinderGeometry(.007,.007,.08,12)),chrome);
+        shaft.position.y = .04;
+        const top = new THREE.Mesh(geometry('stickBall',()=>new THREE.SphereGeometry(.03,20,14)),
+            new THREE.MeshStandardMaterial({color:0xc62d36,roughness:.24}));
+        top.position.y = .09; this.stickPivot.add(shaft,top); panel.add(this.stickPivot);
+        this.buttons = [];
+        const addButton=(x,z,color,keys,small=false)=>{
+            const radius=small?.021:.028;
+            const bezel=new THREE.Mesh(geometry('bezel'+small,()=>new THREE.CylinderGeometry(radius+.005,radius+.007,.012,24)),dark);
+            bezel.position.set(x,.009,z); panel.add(bezel);
+            const mat=new THREE.MeshStandardMaterial({color,roughness:.26,emissive:color,emissiveIntensity:this.broken?0:.10});
+            const cap=new THREE.Mesh(geometry('cap'+small,()=>new THREE.CylinderGeometry(radius*.93,radius,.012,24)),mat);
+            cap.position.set(x,.019,z);cap.userData.keys=keys;cap.userData.restY=.019;panel.add(cap);this.buttons.push(cap);
+        };
+        const colors=[this.color,'#e4b84a','#3a8fbb','#c34243','#637abb','#479879'];
+        const bindings=[['Space'],['KeyC'],['KeyX'],['KeyZ'],['Digit1'],['Digit2','Digit3']];
+        for(let i=0;i<6;i++)addButton(.05+(i%3)*.105,(i<3?.065:-.035)-(i%3)*.012,colors[i],bindings[i]);
+        addButton(-.28,-.17,'#e3e0cc',['Enter','NumpadEnter'],true);
+        addButton(-.15,-.17,'#a8abb3',['KeyP'],true);
+        for(const x of [-.365,.365])for(const z of [-.19,.19]){
+            const screw=new THREE.Mesh(geometry('panelScrew',()=>new THREE.CylinderGeometry(.005,.005,.003,10)),chrome);
+            screw.position.set(x,.004,z);panel.add(screw);
+        }
     }
 
     buildCoinDoor() {
@@ -470,6 +491,7 @@ export default class Cabinet {
     }
 
     setInput(keys) {
+        this.controlKeys = keys;
         const has = (...codes) => codes.some((c) => keys.has(c));
         this.input.x = (has('ArrowRight', 'KeyD') ? 1 : 0) - (has('ArrowLeft', 'KeyA') ? 1 : 0);
         this.input.y = (has('ArrowUp', 'KeyW') ? 1 : 0) - (has('ArrowDown', 'KeyS') ? 1 : 0);
@@ -506,8 +528,11 @@ export default class Cabinet {
         this.stick.y += (this.input.y - this.stick.y) * Math.min(1, dt * 20);
         this.stickPivot.rotation.z = -this.stick.x * 0.35;
         this.stickPivot.rotation.x = -this.stick.y * 0.35;
-        this.buttons[0].position.y = PANEL_TOP_Y + (this.input.button ? 0.003 : 0.009);
-        this.buttons[0].material.emissiveIntensity = this.input.button ? 1.2 : 0.25;
+        for (const button of this.buttons) {
+            const down = this.active && button.userData.keys.some(key => this.controlKeys.has(key));
+            button.position.y = button.userData.restY - (down ? .005 : 0);
+            button.material.emissiveIntensity = this.broken ? 0 : down ? .3 : .10;
+        }
 
         if (this.broken) {
             // A dying tube: occasionally the marquee stutters.

@@ -376,6 +376,9 @@ export function createClawMachine({ position, rotationY }) {
     let carry = 0;               // 0 at the bottom of the drop, 1 over the chute
     let travelDistance = 1;
     let heldSag = 0;
+    const heldOffset = new THREE.Vector3();
+    const heldTarget = new THREE.Vector3();
+    const heldPrevious = new THREE.Vector3();
     let restockTimer = 0;
     let winFlash = 0;
     let sightFade = 0;
@@ -444,8 +447,9 @@ export function createClawMachine({ position, rotationY }) {
     }
 
     function startDrop() {
-        const near = pile.nearest(clawX, clawZ, GRAB_RADIUS);
-        dropTargetY = near ? Math.max(FLOOR_Y + 0.05, near.body.pos.y) : FLOOR_Y + 0.05;
+        // Stop the prong tips at the exposed surface, not at a buried centre.
+        dropTargetY = Math.max(FLOOR_Y + .125, pile.surfaceHeight(clawX, clawZ) + .045);
+        velX = 0; velZ = 0;
         grabDecided = false;
         grabResult = 'miss';
         carry = 0;
@@ -457,7 +461,7 @@ export function createClawMachine({ position, rotationY }) {
     // Fair but stingy: being centred matters most, being buried hurts, and the
     // golden bear is simply a worse bet than a bear.
     function decideGrab() {
-        const near = pile.nearest(clawX, clawZ, GRAB_RADIUS, clawY, 0.17);
+        const near = pile.nearest(clawX, clawZ, GRAB_RADIUS, clawY - .10, 0.12);
         if (!near) {
             grabResult = 'miss';
             held = null;
@@ -489,6 +493,8 @@ export function createClawMachine({ position, rotationY }) {
         if (held) {
             held.held = true;
             held.asleep = false;
+            heldOffset.copy(held.pos).sub(heldTarget.set(clawX,clawY,clawZ));
+            pile.wakeAll();
         }
     }
 
@@ -496,7 +502,9 @@ export function createClawMachine({ position, rotationY }) {
         heldSag = 0;
         if (!held) return;
         held.held = false;
-        held.vel.set(velX * 0.5, -0.1, velZ * 0.5);
+        // A stationary release falls vertically into the chute; a slip keeps
+        // the carriage's momentum instead of an arbitrary sideways kick.
+        held.vel.set(sad ? velX : 0, -.05, sad ? velZ : 0);
         pile.wake(held);
         held = null;
         if (sad) playSadSound();
@@ -504,10 +512,11 @@ export function createClawMachine({ position, rotationY }) {
 
     function restock() {
         if (pile.bodies.length >= PILE_SIZE) return;
-        const type = randomPlushType();
+        const type = pickType();
         const x = THREE.MathUtils.lerp(PLAY.minX + 0.12, PLAY.maxX - 0.12, Math.random());
         const z = THREE.MathUtils.lerp(PLAY.minZ + 0.12, -0.05, Math.random());
         pile.spawn(type, Math.floor(Math.random() * 3), x, GLASS_TOP - 0.12, z);
+        if (pile.bodies.length < PILE_SIZE) restockTimer = .7;
         sounds.noise({ duration: 0.12, volume: 0.1, filterFreq: 900, filterEnd: 200 });
     }
 
@@ -531,12 +540,12 @@ export function createClawMachine({ position, rotationY }) {
         const dx = targetX - clawX;
         const dz = targetZ - clawZ;
         const dist = Math.hypot(dx, dz);
-        if (dist < 1e-4) return true;
+        if (dist < 1e-4) { velX=0;velZ=0;return true; }
         const move = Math.min(dist, speed * dt);
         clawX += (dx / dist) * move;
         clawZ += (dz / dist) * move;
-        velX = (dx / dist) * speed;
-        velZ = (dz / dist) * speed;
+        velX = move === dist ? 0 : (dx / dist) * speed;
+        velZ = move === dist ? 0 : (dz / dist) * speed;
         return dist - move < 1e-3;
     }
 
@@ -606,8 +615,10 @@ export function createClawMachine({ position, rotationY }) {
             break;
         }
         case 'travel': {
-            const done = towards(dt, HOLE.x, HOLE.z, TRAVEL_SPEED);
-            const left = Math.hypot(HOLE.x - clawX, HOLE.z - clawZ);
+            const targetX = HOLE.x - (held ? heldOffset.x : 0);
+            const targetZ = HOLE.z - (held ? heldOffset.z : 0);
+            const done = towards(dt, targetX, targetZ, TRAVEL_SPEED);
+            const left = Math.hypot(targetX - clawX, targetZ - clawZ);
             carry = 0.5 + 0.5 * THREE.MathUtils.clamp(1 - left / travelDistance, 0, 1);
             if (grabResult === 'weak' && carry >= slipAt) {
                 setPhase('slip');
@@ -660,9 +671,11 @@ export function createClawMachine({ position, rotationY }) {
             // A weak grip visibly shivers on the way up: the tell that it is
             // about to go. A solid one barely moves.
             const shake = grabResult === 'weak' ? 0.011 * Math.sin(time * 21) : 0.002 * Math.sin(time * 4);
-            held.pos.set(clawX + shake, clawY - 0.055 - heldSag, clawZ + shake * 0.6);
-            held.vel.set(0, 0, 0);
-            held.tilt = shake * 6;
+            heldPrevious.copy(held.pos);
+            heldTarget.set(clawX + heldOffset.x + shake, clawY + heldOffset.y - heldSag, clawZ + heldOffset.z + shake*.6);
+            held.pos.lerp(heldTarget, 1-Math.exp(-dt*28));
+            held.vel.copy(held.pos).sub(heldPrevious).multiplyScalar(dt>0 ? 1/dt : 0);
+            held.tilt += (shake*6 - velX*.15 - held.tilt)*Math.min(1,dt*8);
             pile.syncMesh(held);
         }
     }
@@ -689,7 +702,7 @@ export function createClawMachine({ position, rotationY }) {
         cable.position.set(clawX, GANTRY_Y - 0.02, clawZ);
         cable.scale.y = Math.max(0.02, GANTRY_Y - 0.02 - clawY);
         claw.position.set(clawX, clawY, clawZ);
-        for (const pivot of prongs) pivot.rotation.x = splay;
+        for (const pivot of prongs) pivot.rotation.x = -splay;
 
         stickPivot.rotation.z = -input.x * 0.3;
         stickPivot.rotation.x = -input.z * 0.3;
@@ -750,7 +763,12 @@ export function createClawMachine({ position, rotationY }) {
             return;
         }
         if (statusTimer > 0) statusTimer -= dt;
-        updatePlay(dt);
+        // Keep the carriage and pile on the same simulation clock at 20–144Hz.
+        const steps = Math.max(1,Math.ceil(dt*90)), step = dt/steps;
+        for(let i=0;i<steps;i++) {
+            updatePlay(step);
+            if (!pile.settled || phase === 'descend' || phase === 'close') pile.update(step);
+        }
         // With no message to show, the readout mirrors the sight ring, so the
         // player can learn what a good line-up looks like without guessing.
         if (statusTimer <= 0) {
@@ -762,7 +780,6 @@ export function createClawMachine({ position, rotationY }) {
             if (restockTimer <= 0) restock();
         }
         // Skip the simulation entirely once everything has gone to sleep.
-        if (!pile.settled || phase === 'descend' || phase === 'close') pile.update(dt);
         updateSight(dt);
         updateVisuals(dt);
         updateSound(dt, camera);
@@ -878,6 +895,8 @@ export function createClawMachine({ position, rotationY }) {
         station,
         get prizeCount() { return prizeCount; },
         update,
+        // The simulation can be inspected without bypassing the station controls.
+        pile,
         // Handy for automated playtests: a snapshot of what the machine is doing.
         debug: () => ({
             phase, statusText, grabResult, prizeCount, held: !!held,

@@ -149,6 +149,9 @@ export default class NeonRacer extends ArcadeGame {
 
     resetGame() {
         this.clock = 0;
+        this.prevClock = 0;
+        this.prevPx = 0;
+        this.prevPy = -1.5;
         this.distance = 0;
         this.prevDistance = 0;
         this.speed = sectorSpeed(1) * 0.5;
@@ -210,6 +213,9 @@ export default class NeonRacer extends ArcadeGame {
 
     updateGame(dt) {
         if (!this.renderer) return;
+        this.prevClock = this.clock;
+        this.prevPx = this.px;
+        this.prevPy = this.py;
         this.clock += dt;
 
         if (this.crashed) {
@@ -325,7 +331,14 @@ export default class NeonRacer extends ArcadeGame {
             if (o.passed || o.s > this.distance) continue;
             o.passed = true;
             if (o.kind === 'rock' && o.dead) continue;
-            const clear = this.obstacles.clearance(o, this.px, this.py, this.clock);
+            // Evaluate the ship and moving hazard at the instant they cross,
+            // not at the end of a frame after the player has already steered away.
+            const span = this.distance - this.prevDistance;
+            const fraction = span > 0 ? Math.max(0, Math.min(1, (o.s - this.prevDistance) / span)) : 1;
+            const x = this.prevPx + (this.px - this.prevPx) * fraction;
+            const y = this.prevPy + (this.py - this.prevPy) * fraction;
+            const time = this.prevClock + (this.clock - this.prevClock) * fraction;
+            const clear = this.obstacles.clearance(o, x, y, time);
             if (this.invuln > 0) continue;
             if (clear < 0) {
                 this.onHit(o);
