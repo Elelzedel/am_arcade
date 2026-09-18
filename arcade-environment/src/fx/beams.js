@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
  * Fake volumetrics. Each beam is an open shell (a tapered tube) drawn
@@ -173,24 +174,21 @@ export function createBeams({ room }) {
     // ---- ceiling panels ------------------------------------------------------
     const shaftGeometry = shellGeometry(roundedRectSection(16, 0.3), [0.5, 0.22], [1.05, 0.62], SHAFT_LENGTH, 5);
     const panels = [[-2.4, -4.2], [2.4, -4.2], [-2.4, 0.8], [2.4, 0.8], [0, 4.4]];
-    panels.forEach(([x, z], i) => {
-        const material = beamMaterial({
-            color: 0xffe3bc,
-            intensity: 0.016,
-            decay: 2.0,
-            nearFade: [0.5, 1.9],
-            farFade: [9, 17],
-            jitter: 0.08,
-        });
-        const shaft = new THREE.Mesh(shaftGeometry, material);
-        shaft.position.set(x, room.height - 0.04, z);
-        shaft.rotation.x = Math.PI / 2;
+    const shaftParams = { color: 0xffe3bc, intensity: 0.016, decay: 2.0, nearFade: [0.5, 1.9], farFade: [9, 17], jitter: 0.08 };
+    // The steady panels breathe in unison, so they share one material and one
+    // merged mesh; the tired one over the entrance stutters on its own.
+    const FLICKER_PANEL = 4;
+    const placed = (x, z) => shaftGeometry.clone().rotateX(Math.PI / 2).translate(x, room.height - 0.04, z);
+    const steady = mergeGeometries(panels.filter((p, i) => i !== FLICKER_PANEL).map(([x, z]) => placed(x, z)));
+    const flickering = placed(...panels[FLICKER_PANEL]);
+    for (const [geometry, flicker] of [[steady, false], [flickering, true]]) {
+        const material = beamMaterial(shaftParams);
+        const shaft = new THREE.Mesh(geometry, material);
         shaft.renderOrder = 6;
         group.add(shaft);
         materials.push(material);
-        // The panel over the entrance is the tired one that stutters.
-        shafts.push({ material, mesh: shaft, base: 0.016, flicker: i === 4 });
-    });
+        shafts.push({ material, mesh: shaft, base: shaftParams.intensity, flicker });
+    }
 
     let time = 0;
     let flicker = 1;

@@ -28,7 +28,7 @@ export const TIERS = {
         reflection: 0,          // mirror texture scale, 0 = off
         reflectionEvery: 3,     // re-render the mirror every n frames
         lights: 0,              // keep lights with priority <= this
-        beams: 'none',          // 'none' | 'crt' | 'all'
+        beams: 'none',          // ceiling light shafts: 'none' | 'all'
         haze: false,
         motes: 0.3,
         crtDetail: 0,           // 0 = single tap, 1 = aberration + halo + grille
@@ -44,7 +44,7 @@ export const TIERS = {
         reflection: 0,
         reflectionEvery: 3,
         lights: 0,
-        beams: 'crt',
+        beams: 'none',
         haze: false,
         motes: 0.5,
         crtDetail: 0,

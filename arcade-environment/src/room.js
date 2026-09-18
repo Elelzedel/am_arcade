@@ -9,6 +9,7 @@ import { createChangeMachine, createSodaMachine, createTrashCan } from './props/
 import { createPatrons } from './props/patrons.js';
 import { getAudioReactive } from './audioReactive.js';
 import { createAtmosphere } from './atmosphere.js';
+import { startBake, bakedMaterial } from './lightmap.js';
 import { HighScoreTable } from '../../games/shared/highscores.js';
 import { font } from '../../games/shared/font.js';
 import { formatScore } from '../../games/shared/ui.js';
@@ -24,14 +25,23 @@ export const ROOM = {
 
 const NEON = ['#ff2bd6', '#00e5ff', '#39ff14', '#ffb000', '#8a5cff'];
 
+// One material per distinct neon colour, so every tube of the same colour
+// batches into a single draw call (see staticBatch.js).
+const neonCache = new Map();
 function neonMaterial(color, intensity = 2.2, normalize = true) {
+    const key = `${color}|${intensity}|${normalize}`;
+    if (neonCache.has(key)) return neonCache.get(key);
     const m = new THREE.MeshBasicMaterial({ color, toneMapped: false });
     // Normalise so a green tube isn't three times brighter than a magenta one.
     const luminance = 0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b;
     const scale = normalize ? Math.min(1, 0.3 / Math.max(luminance, 0.05)) : 1;
     m.color.multiplyScalar(intensity * scale);
+    neonCache.set(key, m);
     return m;
 }
+
+// Baked-lightmap texel size in metres for the floor, ceiling and walls.
+const LIGHTMAP_TEXEL = 0.05;
 
 function box(w, h, d, material, x, y, z) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
@@ -39,8 +49,9 @@ function box(w, h, d, material, x, y, z) {
     return mesh;
 }
 
-function colliderFromBox(x, z, w, d, pad = 0) {
-    return { minX: x - w / 2 - pad, maxX: x + w / 2 + pad, minZ: z - d / 2 - pad, maxZ: z + d / 2 + pad };
+// Colliders double as shadow casters for the lightmap bake, hence the height.
+function colliderFromBox(x, z, w, d, pad = 0, height = 1.8) {
+    return { minX: x - w / 2 - pad, maxX: x + w / 2 + pad, minZ: z - d / 2 - pad, maxZ: z + d / 2 + pad, minY: 0, maxY: height };
 }
 
 // Wall-mounted monitor listing the best score on every machine.
@@ -119,36 +130,47 @@ export function buildRoom(scene, { games }) {
     // trim is built below.
     const audio = getAudioReactive();
     const pulsing = [];
+    // Near-black and fully rough: Lambert shades these exactly like Standard
+    // for a fraction of the per-light cost. Shared so all the runs batch.
+    const baseboardMat = new THREE.MeshLambertMaterial({ color: 0x08060e });
 
     // ---- floor, ceiling, walls ---------------------------------------------
+    // The big planes are lit by a baked lightmap (see lightmap.js): the lights
+    // never move, so most of the screen costs two texture taps instead of a
+    // per-pixel loop over every light in the room.
+    const surfaces = [];
+    const tile = (texture) => {
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        return texture;
+    };
     const carpet = createCarpetTextures();
-    carpet.map.repeat.set(W / 3, D / 3);
-    carpet.emissiveMap.repeat.set(W / 3, D / 3);
     const floor = new THREE.Mesh(
         new THREE.PlaneGeometry(W, D),
-        new THREE.MeshStandardMaterial({
-            map: carpet.map,
-            emissiveMap: carpet.emissiveMap,
-            emissive: new THREE.Color(0xffffff),
+        bakedMaterial({
+            map: tile(carpet.map),
+            mapRepeat: [W / 3, D / 3],
+            emissiveMap: tile(carpet.emissiveMap),
             emissiveIntensity: 0.22,
-            roughness: 0.95,
         }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(cx, 0, cz);
+    floor.name = 'floor';
     scene.add(floor);
+    surfaces.push(floor);
 
-    const ceilingTex = createCeilingTexture();
-    ceilingTex.repeat.set(W / 1.2, D / 1.2);
     const ceiling = new THREE.Mesh(
         new THREE.PlaneGeometry(W, D),
-        new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: 1 }),
+        bakedMaterial({ map: tile(createCeilingTexture()), mapRepeat: [W / 1.2, D / 1.2] }),
     );
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set(cx, H, cz);
+    ceiling.name = 'ceiling';
     scene.add(ceiling);
+    surfaces.push(ceiling);
 
-    const wallMat = new THREE.MeshStandardMaterial({ map: createWallTexture(), roughness: 0.85 });
+    const wallTex = tile(createWallTexture());
     const walls = [
         { w: D, x: ROOM.minX, z: cz, ry: Math.PI / 2 },
         { w: D, x: ROOM.maxX, z: cz, ry: -Math.PI / 2 },
@@ -156,10 +178,7 @@ export function buildRoom(scene, { games }) {
         { w: W, x: cx, z: ROOM.maxZ, ry: Math.PI },
     ];
     for (const wall of walls) {
-        const mat = wallMat.clone();
-        mat.map = wallMat.map.clone();
-        mat.map.repeat.set(wall.w / 2, 1.5);
-        mat.map.needsUpdate = true;
+        const mat = bakedMaterial({ map: wallTex, mapRepeat: [wall.w / 2, 1.5] });
         let wallGeometry;
         if (wall.ry === Math.PI) {
             // The street is real geometry outside now, so the doorway must be
@@ -176,7 +195,9 @@ export function buildRoom(scene, { games }) {
         const mesh = new THREE.Mesh(wallGeometry, mat);
         mesh.position.set(wall.x, H / 2, wall.z);
         mesh.rotation.y = wall.ry;
+        mesh.name = 'wall';
         scene.add(mesh);
+        surfaces.push(mesh);
 
         // Neon trim along the top and a dark baseboard with a thin glow line.
         const along = wall.ry === 0 || wall.ry === Math.PI;
@@ -194,8 +215,7 @@ export function buildRoom(scene, { games }) {
             ? [-1, 1].map(side => ({ w: sideWidth, x: cx + side * (opening + sideWidth) / 2, z: wall.z }))
             : [wall];
         for (const [i, run] of runs.entries()) {
-            const base = box(along ? run.w : 0.03, 0.12, along ? 0.03 : run.w,
-                new THREE.MeshStandardMaterial({ color: 0x08060e }),
+            const base = box(along ? run.w : 0.03, 0.12, along ? 0.03 : run.w, baseboardMat,
                 run.x + inward.x * 0.015, 0.06, run.z + inward.z * 0.015);
             base.name = entrance ? `entrance-baseboard-${i}` : 'wall-baseboard';
             scene.add(base);
@@ -207,16 +227,19 @@ export function buildRoom(scene, { games }) {
         }
     }
 
+    // Trim colours are shared materials; pulse each one once.
+    const pulsed = pulsing.filter((item, i) => pulsing.findIndex((o) => o.material === item.material) === i);
     updaters.push((dt) => {
         audio.update(dt);
         const glow = 0.88 + audio.level * 0.16 + audio.beat * 0.12;
-        for (const item of pulsing) {
+        for (const item of pulsed) {
             item.material.color.copy(item.base).multiplyScalar(glow);
         }
     });
 
     // ---- lighting -----------------------------------------------------------
-    scene.add(new THREE.HemisphereLight(0x5a4a8a, 0x1a0f24, 0.9));
+    const hemisphere = new THREE.HemisphereLight(0x5a4a8a, 0x1a0f24, 0.9);
+    scene.add(hemisphere);
 
     const panelMat = neonMaterial('#fff4e0', 1.3, false);
     const lightSpots = [[-2.4, -4.2], [2.4, -4.2], [-2.4, 0.8], [2.4, 0.8], [0, 4.4]];
@@ -271,7 +294,7 @@ export function buildRoom(scene, { games }) {
     board.position.set(cx, 1.35, ROOM.minZ + 0.095);
     scene.add(board);
     updaters.push((dt) => leaderboard.update(dt));
-    colliders.push(colliderFromBox(cx, ROOM.minZ + 0.05, 2.3, 0.1));
+    colliders.push({ ...colliderFromBox(cx, ROOM.minZ + 0.05, 2.3, 0.1), minY: 0.6, maxY: 2.1 });
 
     // ---- entrance -------------------------------------------------------------
     const doorFrameMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, metalness: 0.7, roughness: 0.3 });
@@ -297,14 +320,15 @@ export function buildRoom(scene, { games }) {
     scene.add(openSign);
 
     // ---- pillars ------------------------------------------------------------------
+    const pillarMat = new THREE.MeshLambertMaterial({ color: 0x1b1428 });
     for (const side of [-1, 1]) {
         const x = side * 2.4;
         const z = -1.4;
-        scene.add(box(0.5, H, 0.5, new THREE.MeshStandardMaterial({ color: 0x1b1428, roughness: 0.7 }), x, H / 2, z));
+        scene.add(box(0.5, H, 0.5, pillarMat, x, H / 2, z));
         for (const y of [0.9, 2.2]) {
             scene.add(box(0.53, 0.035, 0.53, neonMaterial(side < 0 ? '#00e5ff' : '#ff2bd6', 2.2), x, y, z));
         }
-        colliders.push(colliderFromBox(x, z, 0.5, 0.5));
+        colliders.push(colliderFromBox(x, z, 0.5, 0.5, 0, H));
     }
 
     // ---- posters -------------------------------------------------------------
@@ -357,13 +381,13 @@ export function buildRoom(scene, { games }) {
 
     // ---- bench ------------------------------------------------------------------
     {
-        const benchMat = new THREE.MeshStandardMaterial({ color: 0x3a1f5c, roughness: 0.6 });
+        const benchMat = new THREE.MeshLambertMaterial({ color: 0x3a1f5c });
         const legMat = new THREE.MeshStandardMaterial({ color: 0x222228, metalness: 0.8, roughness: 0.3 });
         const { x, z } = seating;
         scene.add(box(0.45, 0.08, 1.5, benchMat, x, 0.45, z));
         scene.add(box(0.06, 0.45, 1.5, benchMat, x + 0.2, 0.72, z));
         for (const dz of [-0.65, 0.65]) scene.add(box(0.4, 0.42, 0.05, legMat, x, 0.21, z + dz));
-        colliders.push(colliderFromBox(x, z, 0.5, 1.55));
+        colliders.push(colliderFromBox(x, z, 0.5, 1.55, 0, 0.95));
     }
 
     // ---- interactive props --------------------------------------------------------
@@ -416,12 +440,45 @@ export function buildRoom(scene, { games }) {
         }
     }
 
+    // Baked lighting for the floor, ceiling and walls: every point light in the
+    // room, shadowed by the machines and furniture. Started as soon as the room
+    // exists (the cabinets are described up front so their lights and
+    // footprints go in before they are built) and applied when it lands.
+    function startBakeFor({ cabinetLights = [], cabinetBounds = [] } = {}) {
+        const started = performance.now();
+        scene.updateMatrixWorld(true);
+        const roomLights = [];
+        scene.traverse((object) => {
+            if (object.isPointLight) roomLights.push(object);
+        });
+        const occluders = [
+            ...colliders.map((c) => ({ minY: 0, maxY: 1.8, ...c })),
+            ...cabinetBounds.map((b) => ({ ...b, minY: 0, maxY: 1.95 })),
+        ];
+        return startBake({
+            surfaces,
+            lights: [...roomLights, ...cabinetLights],
+            hemisphere,
+            occluders,
+            texel: LIGHTMAP_TEXEL,
+        }).then((textures) => {
+            textures.forEach((texture, i) => {
+                surfaces[i].material.uniforms.lightMap.value = texture;
+            });
+            console.info(`AM Arcade: baked ${surfaces.length} lightmaps from ${roomLights.length + cabinetLights.length} lights in ${(performance.now() - started).toFixed(0)} ms`);
+        });
+    }
+
     return {
         colliders,
         bounds: { ...ROOM },
         stations,
         props,
         atmosphere,
+        surfaces,
+        startBake: startBakeFor,
+        // The aisle mirror's own render pass; call once per frame before rendering.
+        renderReflection: (renderer, camera) => atmosphere.renderReflection(renderer, camera),
         // Quality tier knobs (see quality.js).
         setQuality: (settings) => {
             lightLevel = settings.lights;

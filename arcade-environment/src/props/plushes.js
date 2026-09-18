@@ -190,6 +190,7 @@ export function createPlush(typeIndex, variant = 0) {
     const mesh = new THREE.Mesh(variantGeometry(type, v), type.gold ? goldMaterial : plushMaterial);
     mesh.userData.type = typeIndex;
     mesh.userData.variant = v;
+    mesh.userData.dynamic = true; // piles shift and prizes get carried about
     return mesh;
 }
 

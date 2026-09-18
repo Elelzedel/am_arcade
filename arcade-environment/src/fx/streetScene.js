@@ -14,15 +14,19 @@ export function createStreetScene() {
     const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
     const atlas = createBlockTexture();
     const materials = new Map();
-    function surface(color, { map = null, glow = 0, grain = 0.13 } = {}) {
-        const key = `${color}:${map?.uuid || "none"}:${glow}:${grain}`;
-        if (materials.has(key)) return materials.get(key);
-        const material = new THREE.ShaderMaterial({
-            uniforms: { color: { value: new THREE.Color(color) }, map: { value: map }, glow: { value: glow }, grain: { value: grain } },
-            defines: map ? { USE_MAP: '' } : {},
-            vertexShader: `varying vec2 vUv; varying vec3 vP; varying vec3 vN; varying vec3 vView;
-                void main() { vUv=uv; vP=position; vN=normal; vView=(inverse(modelMatrix)*vec4(cameraPosition,1.)).xyz-position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-            fragmentShader: `uniform vec3 color; uniform sampler2D map; uniform float glow; uniform float grain;
+    // Every street surface runs one shader. While the scene is authored each
+    // (colour, glow, grain) gets its own material; once built, everything
+    // rigid is merged and those three values ride along as vertex attributes,
+    // so the whole block is a couple of draw calls instead of one per finish.
+    function surfaceShader(perVertex) {
+        const params = perVertex
+            ? 'attribute vec3 aTint; attribute vec2 aFinish; varying vec3 color; varying float glow; varying float grain;'
+            : 'uniform vec3 color; uniform float glow; uniform float grain;';
+        const pass = perVertex ? 'color=aTint; glow=aFinish.x; grain=aFinish.y;' : '';
+        return {
+            vertexShader: `${perVertex ? params : ''} varying vec2 vUv; varying vec3 vP; varying vec3 vN; varying vec3 vView;
+                void main() { ${pass} vUv=uv; vP=position; vN=normal; vView=(inverse(modelMatrix)*vec4(cameraPosition,1.)).xyz-position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+            fragmentShader: `${perVertex ? 'varying vec3 color; varying float glow; varying float grain;' : params} uniform sampler2D map;
                 varying vec2 vUv; varying vec3 vP; varying vec3 vN; varying vec3 vView;
                 float hash(vec3 p) { return fract(sin(dot(p,vec3(12.98,78.23,38.71)))*43758.54); }
                 float noise3(vec3 p) {
@@ -58,10 +62,75 @@ export function createStreetScene() {
                     #include <tonemapping_fragment>
                     #include <colorspace_fragment>
                 }`,
+        };
+    }
+    function surface(color, { map = null, glow = 0, grain = 0.13 } = {}) {
+        const key = `${color}:${map?.uuid || "none"}:${glow}:${grain}`;
+        if (materials.has(key)) return materials.get(key);
+        const material = new THREE.ShaderMaterial({
+            uniforms: { color: { value: new THREE.Color(color) }, map: { value: map }, glow: { value: glow }, grain: { value: grain } },
+            defines: map ? { USE_MAP: '' } : {},
+            ...surfaceShader(false),
             fog: false,
         });
+        material.userData.surface = { color: material.uniforms.color.value, map, glow, grain };
         materials.set(key, material);
         return material;
+    }
+    // Merged materials: one with the facade atlas, one without.
+    const batchMaterials = new Map();
+    function batchMaterial(map) {
+        if (!batchMaterials.has(map)) {
+            batchMaterials.set(map, new THREE.ShaderMaterial({
+                uniforms: { map: { value: map } },
+                defines: map ? { USE_MAP: '' } : {},
+                ...surfaceShader(true),
+                fog: false,
+            }));
+        }
+        return batchMaterials.get(map);
+    }
+    // Replaces every opaque surface() mesh directly under `parent` with one
+    // merged mesh per atlas, baking each mesh's transform and finish in.
+    function mergeSurfaces(parent) {
+        parent.updateMatrixWorld(true);
+        const groups = new Map();
+        for (const m of [...parent.children]) {
+            const finish = m.isMesh && m.material.userData.surface;
+            if (!finish || m.material.transparent) continue;
+            let geo = m.geometry.clone().applyMatrix4(m.matrix);
+            if (geo.index) { const old = geo; geo = geo.toNonIndexed(); old.dispose(); }
+            if (m.material.side === THREE.DoubleSide) {
+                // Two-sided panes become a front and a mirrored back copy.
+                const back = geo.clone();
+                const pos = back.attributes.position, nor = back.attributes.normal;
+                for (let i = 0; i < pos.count; i += 3) {
+                    for (const attr of [pos, nor]) {
+                        const x = attr.getX(i + 1), y = attr.getY(i + 1), z = attr.getZ(i + 1);
+                        attr.setXYZ(i + 1, attr.getX(i + 2), attr.getY(i + 2), attr.getZ(i + 2));
+                        attr.setXYZ(i + 2, x, y, z);
+                    }
+                }
+                for (let i = 0; i < nor.count; i++) nor.setXYZ(i, -nor.getX(i), -nor.getY(i), -nor.getZ(i));
+                const both = mergeGeometries([geo, back]); geo.dispose(); back.dispose(); geo = both;
+            }
+            const n = geo.attributes.position.count;
+            const tint = new Float32Array(n * 3), fin = new Float32Array(n * 2);
+            for (let i = 0; i < n; i++) {
+                tint[i * 3] = finish.color.r; tint[i * 3 + 1] = finish.color.g; tint[i * 3 + 2] = finish.color.b;
+                fin[i * 2] = finish.glow; fin[i * 2 + 1] = finish.grain;
+            }
+            geo.setAttribute('aTint', new THREE.BufferAttribute(tint, 3));
+            geo.setAttribute('aFinish', new THREE.BufferAttribute(fin, 2));
+            if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+            if (!groups.has(finish.map)) groups.set(finish.map, []);
+            groups.get(finish.map).push(geo);
+            parent.remove(m); m.geometry.dispose();
+        }
+        for (const [map, geometries] of groups) {
+            parent.add(new THREE.Mesh(mergeGeometries(geometries), batchMaterial(map)));
+            geometries.forEach((g) => g.dispose());
+        }
     }
     const masonry = surface('#615857'), concrete = surface('#686a67'), iron = surface('#283239'), edge = surface('#75807f');
     const dark = surface('#182026'), teal = surface('#31504e'), wood = surface('#5d4636');
@@ -256,26 +325,38 @@ export function createStreetScene() {
     const groundGeo=new THREE.PlaneGeometry(100,65);groundGeo.rotateX(-Math.PI/2);groundGeo.translate(0,-.035,-31);
     mesh(groundGeo,roadMaterial,0,0,0);
 
-    const car=createCar(surface,box,mesh,rod);
+    const car=createCar(surface,box,mesh,rod,mergeSurfaces);
     car.group.name='passing-sedan'; group.add(car.group);
     // Rain has real depth, ends at the pavement, and stays outside the arcade.
-    const count=950, rainPos=new Float32Array(count*6), drops=[];
-    for(let i=0;i<count;i++) drops.push({x:(random()-.5)*42,z:-1.9-random()*24,y:random()*9,speed:6+random()*4,length:.045+random()*.09});
-    const rainGeo=new THREE.BufferGeometry();rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3).setUsage(THREE.DynamicDrawUsage));
-    const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0x8198aa,transparent:true,opacity:.12,depthWrite:false,fog:false}));
+    // Every drop falls in the vertex shader (start height, speed and length
+    // are attributes), so the 950 streaks cost nothing per frame on the CPU.
+    const count=950, rainPos=new Float32Array(count*6), rainTip=new Float32Array(count*2), rainSpeed=new Float32Array(count*2), rainLength=new Float32Array(count*2);
+    for(let i=0;i<count;i++) {
+        const x=(random()-.5)*42, z=-1.9-random()*24, y=random()*8.8, speed=6+random()*4, length=.045+random()*.09;
+        rainPos.set([x,y,z,x,y,z],i*6); rainTip.set([0,1],i*2); rainSpeed.set([speed,speed],i*2); rainLength.set([length,length],i*2);
+    }
+    const rainGeo=new THREE.BufferGeometry();
+    rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));
+    rainGeo.setAttribute('aTip',new THREE.BufferAttribute(rainTip,1));
+    rainGeo.setAttribute('aSpeed',new THREE.BufferAttribute(rainSpeed,1));
+    rainGeo.setAttribute('aLength',new THREE.BufferAttribute(rainLength,1));
+    const rainMaterial=new THREE.ShaderMaterial({
+        uniforms:{uTime:{value:0},uColor:{value:new THREE.Color(0x8198aa)},uOpacity:{value:.12}},
+        vertexShader:`attribute float aTip; attribute float aSpeed; attribute float aLength; uniform float uTime;
+            void main(){ vec3 p=position; p.y=.17+mod(p.y-uTime*aSpeed,8.8)+aTip*aLength; p.x-=aTip*.018;
+                gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.); }`,
+        fragmentShader:`uniform vec3 uColor; uniform float uOpacity;
+            void main(){
+                gl_FragColor=vec4(uColor,uOpacity);
+                #include <tonemapping_fragment>
+                #include <colorspace_fragment>
+            }`,
+        transparent:true,depthWrite:false,fog:false,
+    });
+    const rain=new THREE.LineSegments(rainGeo,rainMaterial);
     rain.frustumCulled=false;group.add(rain);
-    // Bake transformed static meshes per material to keep the detailed street cheap.
-    staticGroup.updateMatrixWorld(true);
-    const batches=new Map();
-    for(const m of [...staticGroup.children]) {
-        if(!m.isMesh || m.material.transparent || m.material===roadMaterial) continue;
-        const geo=m.geometry.clone().applyMatrix4(m.matrix);
-        if(!batches.has(m.material)) batches.set(m.material,[]);
-        batches.get(m.material).push(geo);staticGroup.remove(m);m.geometry.dispose();
-    }
-    for(const [material,geometries] of batches) {
-        const merged=mergeGeometries(geometries);staticGroup.add(new THREE.Mesh(merged,material));geometries.forEach(g=>g.dispose());
-    }
+    // Bake the whole rigid street into two draw calls (with / without the atlas).
+    mergeSurfaces(staticGroup);
     let time=0;
     function update(dt) {
         time+=dt;roadMaterial.uniforms.uTime.value=time;
@@ -285,17 +366,13 @@ export function createStreetScene() {
         car.group.position.set(x,0,z);car.group.rotation.y=direction>0?0:Math.PI;
         carUniform.value.set(x,z,car.group.visible?1:0,direction);
         for(const wheel of car.wheels) wheel.rotation.z=-time*5.6/.29;
-        for(let i=0;i<count;i++) {
-            const d=drops[i];d.y-=dt*d.speed;if(d.y<.17)d.y+=8.8;
-            rainPos.set([d.x,d.y,d.z,d.x-.018,d.y+d.length,d.z],i*6);
-        }
-        rainGeo.attributes.position.needsUpdate=true;
+        rainMaterial.uniforms.uTime.value=time;
     }
     update(0);
     return {group,update,car:car.group,carUniform};
 }
 
-function createCar(surface,box,mesh,rod) {
+function createCar(surface,box,mesh,rod,mergeSurfaces) {
     const group=new THREE.Group(), wheels=[];
     const paint=surface('#344448',{grain:.015}), rubber=surface('#10151a',{grain:.1}), trim=surface('#7c8587',{grain:.02});
     const glass=surface('#243b49',{grain:0}), light=surface('#e3dbc0',{glow:1,grain:0}), red=surface('#a93628',{glow:.75,grain:0});
@@ -345,15 +422,8 @@ function createCar(surface,box,mesh,rod) {
     box(.045,.12,.65,rubber,2.2,.52,0,group);
     for(let z=-.25;z<.3;z+=.07) box(.049,.014,.04,trim,2.22,.52,z,group);
     box(.05,.085,.29,trim,-2.235,.45,0,group);
-    // Merge rigid bodywork by material, keeping the wheel assemblies movable.
-    const batches=new Map();group.updateMatrixWorld(true);
-    for(const m of [...group.children]) {
-        if(!m.isMesh)continue;
-        let geo=m.geometry.clone().applyMatrix4(m.matrix);
-        if(geo.index){const old=geo;geo=geo.toNonIndexed();old.dispose();}
-        if(!batches.has(m.material))batches.set(m.material,[]);
-        batches.get(m.material).push(geo);group.remove(m);m.geometry.dispose();
-    }
-    for(const [mat,geos] of batches){group.add(new THREE.Mesh(mergeGeometries(geos),mat));geos.forEach(g=>g.dispose());}
+    // Merge the rigid bodywork into one draw, and each spinning wheel into one.
+    mergeSurfaces(group);
+    for(const wheel of wheels) mergeSurfaces(wheel);
     return {group,wheels};
 }

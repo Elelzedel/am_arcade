@@ -25,6 +25,8 @@ import Hud from './hud.js';
 import Ambience from './ambience.js';
 import { buildRoom, ROOM } from './room.js';
 import { createQuality, pixelRatioFor, TIERS } from './quality.js';
+import { batchStatic } from './staticBatch.js';
+import { warmBakeWorkers } from './lightmap.js';
 
 const GAMES = [TankGame, NeonRacer, StarSwarm, BrickBlitz, NeonSnake];
 
@@ -53,6 +55,13 @@ const RAW_INPUT = params.get('raw') !== '0';
 const INPUT_DEBUG = params.has('inputdebug');
 // ?quality=potato|low|medium|high|ultra pins the quality tier (see quality.js).
 const QUALITY_OVERRIDE = params.get('quality');
+
+// The model and font start downloading before anything else, so the WebGL
+// context and the room's textures are built while the network works.
+const assets = Promise.all([
+    new GLTFLoader().loadAsync(cabinetModelUrl),
+    loadArcadeFont(),
+]);
 
 // ---- renderer & scene -------------------------------------------------------
 // No backbuffer MSAA: every frame goes through the composer, so the canvas
@@ -101,6 +110,16 @@ function resize() {
     if (bloom.enabled) bloom.setSize(Math.max(2, w * ratio * s.bloom * 2), Math.max(2, h * ratio * s.bloom * 2));
 }
 
+// Compiles every shader the scene needs. Programs are keyed on the render
+// target they draw into, so this compiles against the composer's buffer, where
+// every frame actually renders, rather than the canvas.
+function precompile() {
+    renderer.setRenderTarget(composer.renderTarget1);
+    const done = renderer.compileAsync(scene, camera).catch(() => {});
+    renderer.setRenderTarget(null);
+    return done;
+}
+
 // Pushes the current tier into everything that has a quality knob.
 function applyQuality() {
     const s = quality.settings;
@@ -115,7 +134,7 @@ function applyQuality() {
     for (const cabinet of cabinets) cabinet.setQuality(s);
     // Dropping or adding lights changes every lit shader; compile the new
     // variants in the background rather than one by one mid-frame.
-    if (room) renderer.compileAsync(scene, camera).catch(() => {});
+    if (room) precompile();
 }
 
 installIcons();
@@ -150,11 +169,20 @@ const projScreen = new THREE.Matrix4();
 const due = [];
 
 // ---- loading ------------------------------------------------------------------
-Promise.all([
-    new GLTFLoader().loadAsync(cabinetModelUrl),
-    loadArcadeFont(),
-]).then(([gltf]) => {
+const loadStarted = performance.now();
+const timeline = [];
+const mark = (label) => timeline.push(`${label} ${(performance.now() - loadStarted).toFixed(0)} (${renderer.info.programs.length} programs)`);
+// Lightmap workers boot while the model and font download.
+warmBakeWorkers();
+assets.then(([gltf]) => {
+    mark('assets');
     room = buildRoom(scene, { games: GAMES });
+    mark('room');
+    // The lightmap bake runs in the workers from here on, overlapping everything below.
+    const baking = room.startBake({
+        cabinetLights: LAYOUT.filter((l) => l.game).map(({ game, wall, z }) => Cabinet.spillLight(new THREE.Vector3(wall.x, 0, z), wall.rotationY, game.meta.color)),
+        cabinetBounds: LAYOUT.map(({ wall, z }) => Cabinet.footprint(new THREE.Vector3(wall.x, 0, z), wall.rotationY)),
+    });
     const baseModel = gltf.scene.getObjectByProperty('type', 'Mesh');
     baseModel.updateMatrixWorld(true);
     cabinets = LAYOUT.map(({ game, wall, z }) => {
@@ -167,22 +195,36 @@ Promise.all([
         scene.add(cabinet.group);
         return cabinet;
     });
+    mark('cabinets');
     room.onCabinets(cabinets);
     stations = [...cabinets, ...room.stations];
     player.setColliders([...room.colliders, ...cabinets.map((c) => c.bounds)], room.bounds);
+    // Fold everything that never moves into one draw call per material. The
+    // simulation is what tells static from animated (see staticBatch.js).
+    const batched = batchStatic(scene, () => {
+        for (let i = 0; i < 200; i++) {
+            room.update(1 / 30, camera);
+            for (const cabinet of cabinets) cabinet.update(1 / 30, camera, frustum);
+        }
+    });
+    console.info(`AM Arcade: static batching ${batched.before} meshes -> ${batched.after} (${batched.merged} batches, ${batched.frozen} matrices frozen)`);
+    mark('batch');
     applyQuality();
     console.info(`AM Arcade: quality ${quality.tier} (${quality.guess.gpu || 'unknown gpu'})`);
     window.arcade = {
         cabinets, stations, player, look, room, enter: enterStation, leave: leaveStation,
-        get state() { return state; }, benchmark, camera, renderer, composer, bloom, quality, TIERS,
+        get state() { return state; }, benchmark, camera, renderer, composer, bloom, quality, TIERS, batched,
         audio: getAudioReactive(),
     };
     // Compile every shader and upload every texture before the curtain goes
     // up, so the first steps into the room don't stutter.
     updateIntroCamera(0);
-    return renderer.compileAsync(scene, camera).catch(() => {}).then(() => {
+    const compiling = precompile().then(() => mark('compile'));
+    return Promise.all([compiling, baking.then(() => mark('bake'))]).then(() => {
         for (const cabinet of cabinets) if (!cabinet.broken) cabinet.renderFrame(renderer);
         composer.render();
+        mark('warmup');
+        console.info(`AM Arcade: load timeline (ms) ${timeline.join(', ')}`);
         state = 'intro';
         hud.setReady();
         hud.fadeIn();
@@ -521,7 +563,10 @@ function tick(dt) {
     projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(projScreen);
 
-    if (room) room.update(dt, camera);
+    if (room) {
+        room.update(dt, camera);
+        room.renderReflection(renderer, camera);
+    }
     // Copying a game screen to the GPU costs a few ms, so only a couple of
     // attract-mode screens refresh per frame; the machine being played always does.
     due.length = 0;
@@ -551,13 +596,14 @@ renderer.setAnimationLoop(() => {
     quality.sample(dt, phase);
 });
 
-// Debug: average milliseconds per frame (CPU + GPU flush) over n frames.
-function benchmark(n = 60) {
+// Debug: average milliseconds per frame over n frames. With `finish` the GPU
+// is drained every frame (CPU + GPU cost); without it, only the CPU side.
+function benchmark(n = 60, finish = true) {
     const gl = renderer.getContext();
     const start = performance.now();
     for (let i = 0; i < n; i++) {
         tick(1 / 60);
-        gl.finish();
+        if (finish) gl.finish();
     }
     return (performance.now() - start) / n;
 }

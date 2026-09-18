@@ -144,12 +144,18 @@ export function createAisle({ room, panels }) {
     // The second scene render is almost entirely draw-call overhead (its
     // resolution barely registers), so it runs at half rate. The reflection is
     // blurred and dim enough that a frame of lag is invisible.
+    // The mirror is rendered as its own top-level pass (see render()), not
+    // from onBeforeRender: a nested render runs on a second render state whose
+    // light-state version differs, which makes three.js re-resolve the shader
+    // program of every lit material twice a frame.
     const renderReflection = reflector.onBeforeRender;
+    reflector.onBeforeRender = () => {};
     let frame = 0;
     let every = 2;
     let enabled = true;
     let cleared = false;
-    reflector.onBeforeRender = function (renderer, target, camera) {
+    function render(renderer, scene, camera) {
+        if (!reflector.visible) return;
         if (!enabled) {
             // Not rendering the mirror leaves the last view frozen in the floor;
             // a black texture reads as plain dark tile instead.
@@ -164,8 +170,8 @@ export function createAisle({ room, panels }) {
             return;
         }
         cleared = false;
-        if (frame++ % every === 0) renderReflection.call(this, renderer, target, camera);
-    };
+        if (frame++ % every === 0) renderReflection.call(reflector, renderer, scene, camera);
+    }
 
     // Quality tier knobs: scale of the mirror texture (0 = no reflections at
     // all, the tile stays) and how many frames each reflection is kept for.
@@ -193,5 +199,5 @@ export function createAisle({ room, panels }) {
         reflector.visible = enabled;
     }
 
-    return { group, reflector, update, setEnabled, setQuality };
+    return { group, reflector, render, update, setEnabled, setQuality };
 }

@@ -397,6 +397,7 @@ export function createJukebox({ position, rotationY }) {
     // The spin lives on its own group: rotating the tilted meshes directly would
     // compose with their tilt and turn the record edge-on.
     const spinner = new THREE.Group();
+    spinner.userData.dynamic = true; // spins while a record plays; never batched
     platter.add(spinner);
 
     let labelTexture = recordLabelTexture(TRACKS[DEFAULT_TRACK].color);
@@ -414,6 +415,7 @@ export function createJukebox({ position, rotationY }) {
 
     // Tone arm: parked clear of the platter, swings in while a track plays.
     const armPivot = new THREE.Group();
+    armPivot.userData.dynamic = true;
     armPivot.position.set(0.215, RECORD_Y + 0.15, FRONT + 0.035);
     group.add(armPivot);
     {

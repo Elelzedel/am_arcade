@@ -258,6 +258,7 @@ function contactShadow(root, x, z, w, d) {
 
 export function createPatrons({ brokenCabinet, bench }) {
     const group = new THREE.Group();
+    group.userData.dynamic = true; // people fidget; never batch them
     group.name = 'arcade-regulars';
     const colliders = [];
     const people = [];

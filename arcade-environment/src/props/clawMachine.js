@@ -179,15 +179,26 @@ export function createClawMachine({ position, rotationY }) {
     marquee.mesh.position.set(0, HOOD_Y - 0.09, D / 2 + 0.022);
     group.add(marquee.mesh);
 
-    const bulbGeo = new THREE.SphereGeometry(0.016, 8, 6);
-    const bulbs = [];
-    for (let i = 0; i < 9; i++) {
-        const mat = new THREE.MeshBasicMaterial({ color: 0xffc98a, toneMapped: false });
-        const bulb = new THREE.Mesh(bulbGeo, mat);
-        bulb.position.set(-0.36 + i * 0.09, HOOD_Y + 0.135, D / 2 - 0.02);
-        group.add(bulb);
-        bulbs.push(mat);
+    // Nine chase bulbs in one instanced draw; their colours animate per instance.
+    const BULBS = 9;
+    const bulbs = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(0.016, 8, 6),
+        new THREE.MeshBasicMaterial({ toneMapped: false }),
+        BULBS,
+    );
+    {
+        const dummy = new THREE.Object3D();
+        const warm = new THREE.Color(0xffc98a);
+        for (let i = 0; i < BULBS; i++) {
+            dummy.position.set(-0.36 + i * 0.09, HOOD_Y + 0.135, D / 2 - 0.02);
+            dummy.updateMatrix();
+            bulbs.setMatrixAt(i, dummy.matrix);
+            bulbs.setColorAt(i, warm);
+        }
+        bulbs.instanceMatrix.needsUpdate = true;
     }
+    group.add(bulbs);
+    const bulbColor = new THREE.Color();
 
     const light = new THREE.PointLight(0xffc27a, 2.2, 3.2, 1.5);
     light.position.set(0, 1.8, 0.1);
@@ -335,6 +346,9 @@ export function createClawMachine({ position, rotationY }) {
     const shelf = new THREE.Group();
     shelf.position.y = TOP_Y;
     group.add(shelf);
+    // Everything the player drives (or that pops when a prize lands) must stay
+    // out of the static batch; the pile flags its own plushes.
+    for (const part of [stickPivot, dropButton, trolley, bridge, cable, claw, sight, shelf]) part.userData.dynamic = true;
     const shown = [];
     function layoutShelf(popLast = false) {
         for (const mesh of shown) shelf.remove(mesh);
@@ -715,11 +729,13 @@ export function createClawMachine({ position, rotationY }) {
         // Bulb chase, and a hard flash when a prize drops.
         winFlash = Math.max(0, winFlash - dt);
         const flashing = winFlash > 0 && Math.sin(winFlash * 30) > 0;
-        for (let i = 0; i < bulbs.length; i++) {
+        for (let i = 0; i < BULBS; i++) {
             const chase = 0.35 + 0.65 * Math.pow(Math.max(0, Math.sin(time * 3 - i * 0.6)), 6);
-            if (flashing) bulbs[i].color.setRGB(2.4, 2.0, 1.2);
-            else bulbs[i].color.setRGB(chase * 1.1, chase * 0.8, chase * 0.45);
+            if (flashing) bulbColor.setRGB(2.4, 2.0, 1.2);
+            else bulbColor.setRGB(chase * 1.1, chase * 0.8, chase * 0.45);
+            bulbs.setColorAt(i, bulbColor);
         }
+        bulbs.instanceColor.needsUpdate = true;
         light.intensity = flashing ? 4.5 : 1.5 + 0.12 * Math.sin(time * 2.3);
         if (winFlash > 0) light.color.setHSL((time * 0.7) % 1, 0.8, 0.6);
         else light.color.setHex(0xffc27a);
@@ -886,6 +902,8 @@ export function createClawMachine({ position, rotationY }) {
             maxX: Math.max(...corners.map((c) => c.x)),
             minZ: Math.min(...corners.map((c) => c.z)),
             maxZ: Math.max(...corners.map((c) => c.z)),
+            minY: 0,
+            maxY: 2.0,
         });
     }
 

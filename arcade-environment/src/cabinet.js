@@ -98,41 +98,49 @@ const crtFragment = /* glsl */`
     }
 `;
 
-function recolorTexture(image, color) {
+// The model paints its neon trim pure magenta. The trim pixels are located
+// once (the texture is shared by every cabinet); each machine then only
+// paints those pixels in its own colour, both on the colour map and on a
+// black emissive map that makes the trim glow.
+let trimCache = null;
+function trimPixels(image) {
+    if (trimCache && trimCache.image === image) return trimCache;
     const c = document.createElement('canvas');
     c.width = image.width;
     c.height = image.height;
     const ctx = c.getContext('2d');
     ctx.drawImage(image, 0, 0);
-    const data = ctx.getImageData(0, 0, c.width, c.height);
+    const base = ctx.getImageData(0, 0, c.width, c.height).data;
+    const glow = new Uint8ClampedArray(base.length);
+    const indices = [];
+    for (let i = 0; i < base.length; i += 4) {
+        if (base[i] > 200 && base[i + 1] < 60 && base[i + 2] > 200) indices.push(i);
+        glow[i + 3] = 255;
+    }
+    trimCache = { image, base, glow, indices: Uint32Array.from(indices) };
+    return trimCache;
+}
 
-    const glow = document.createElement('canvas');
-    glow.width = c.width;
-    glow.height = c.height;
-    const glowCtx = glow.getContext('2d');
-    const glowData = glowCtx.createImageData(c.width, c.height);
-
+function recolorTexture(image, color) {
+    const { base, glow, indices } = trimPixels(image);
     const target = new THREE.Color(color);
     const r = Math.round(target.r * 255);
     const g = Math.round(target.g * 255);
     const b = Math.round(target.b * 255);
-    for (let i = 0; i < data.data.length; i += 4) {
-        // The model paints its neon trim pure magenta; swap it for the game colour.
-        const isTrim = data.data[i] > 200 && data.data[i + 1] < 60 && data.data[i + 2] > 200;
-        if (isTrim) {
+
+    const paint = (template) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const ctx = canvas.getContext('2d');
+        const data = ctx.createImageData(canvas.width, canvas.height);
+        data.data.set(template);
+        for (const i of indices) {
             data.data[i] = r;
             data.data[i + 1] = g;
             data.data[i + 2] = b;
-            glowData.data[i] = r;
-            glowData.data[i + 1] = g;
-            glowData.data[i + 2] = b;
         }
-        glowData.data[i + 3] = 255;
-    }
-    ctx.putImageData(data, 0, 0);
-    glowCtx.putImageData(glowData, 0, 0);
-
-    const make = (canvas) => {
+        ctx.putImageData(data, 0, 0);
         const t = new THREE.CanvasTexture(canvas);
         t.colorSpace = THREE.SRGBColorSpace;
         t.magFilter = THREE.NearestFilter;
@@ -141,7 +149,7 @@ function recolorTexture(image, color) {
         t.flipY = false; // glTF UV convention
         return t;
     };
-    return { map: make(c), emissiveMap: make(glow) };
+    return { map: paint(base), emissiveMap: paint(glow) };
 }
 
 // Bright colours (cyan, green) bloom far more than dark ones (red, magenta),
@@ -157,6 +165,42 @@ function geometry(key, create) {
     if (!sharedGeometry[key]) sharedGeometry[key] = create();
     return sharedGeometry[key];
 }
+
+// Materials shared by every cabinet, so their static parts batch into one
+// draw call across all machines (see staticBatch.js).
+const sharedMaterial = {};
+function material(key, create) {
+    if (!sharedMaterial[key]) sharedMaterial[key] = create();
+    return sharedMaterial[key];
+}
+
+// Button caps: one instanced mesh per cabinet. Each instance carries its own
+// colour (instanceColor) and glow (instanceGlow) so the emissive lights up when
+// the key is held, without a material or draw call per button.
+function capMaterial() {
+    const mat = new THREE.MeshStandardMaterial({ roughness: .26, emissive: 0xffffff, emissiveIntensity: 1 });
+    mat.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\nattribute float instanceGlow;\nvarying float vGlow;')
+            .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = instanceGlow;');
+        shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nvarying float vGlow;')
+            .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vColor * vGlow;');
+    };
+    mat.customProgramCacheKey = () => 'cabinet-cap';
+    return mat;
+}
+const CAP_RADIUS = .028;
+const CAP_REST_Y = .019;
+const CAP_TRAVEL = .005;
+
+// The screen's spill light; also fed to the lightmap bake before any cabinet exists.
+const SPILL = { position: new THREE.Vector3(0, 1.25, 0.88), intensity: 0.38, distance: 1.8, decay: 2 };
+
+const UP = new THREE.Vector3(0, 1, 0);
+const cabinetMatrix = (position, rotationY) => new THREE.Matrix4().compose(
+    position, new THREE.Quaternion().setFromAxisAngle(UP, rotationY), new THREE.Vector3(1, 1, 1),
+);
 
 export default class Cabinet {
     /**
@@ -261,8 +305,8 @@ export default class Cabinet {
         // pixel a loop iteration.
         this.light = null;
         if (!this.broken) {
-            this.light = new THREE.PointLight(this.color, 0.38, 1.8, 2);
-            this.light.position.set(0, 1.25, 0.88);
+            this.light = new THREE.PointLight(this.color, SPILL.intensity, SPILL.distance, SPILL.decay);
+            this.light.position.copy(SPILL.position);
             this.light.userData.priority = 0;
             this.group.add(this.light);
         }
@@ -315,8 +359,8 @@ export default class Cabinet {
         this.group.add(panel);
         this.controlPanel = panel;
         this.controlKeys = new Set();
-        const dark = new THREE.MeshStandardMaterial({ color: 0x16191e, roughness: .38 });
-        const chrome = new THREE.MeshStandardMaterial({ color: 0xa2a5a7, roughness: .28, metalness: .7 });
+        const dark = material('panelDark', () => new THREE.MeshStandardMaterial({ color: 0x16191e, roughness: .38 }));
+        const chrome = material('panelChrome', () => new THREE.MeshStandardMaterial({ color: 0xa2a5a7, roughness: .28, metalness: .7 }));
         const action = { 'tank-artillery': 'FIRE', 'star-swarm': 'FIRE', 'neon-racer': 'BOOST',
             'brick-blitz': 'LAUNCH', 'neon-snake': 'DASH' }[this.meta.id] || 'PLAY';
         const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 512;
@@ -335,25 +379,45 @@ export default class Cabinet {
         const base = new THREE.Mesh(geometry('stickBase',()=>new THREE.CylinderGeometry(.045,.045,.01,24)),dark);
         base.position.set(-.24,.009,.025); panel.add(base);
         this.stickPivot = new THREE.Group(); this.stickPivot.position.set(-.24,.01,.025);
+        this.stickPivot.userData.dynamic = true; // follows the player's input; never batched
         const shaft = new THREE.Mesh(geometry('stickShaft',()=>new THREE.CylinderGeometry(.007,.007,.08,12)),chrome);
         shaft.position.y = .04;
         const top = new THREE.Mesh(geometry('stickBall',()=>new THREE.SphereGeometry(.03,20,14)),
-            new THREE.MeshStandardMaterial({color:0xc62d36,roughness:.24}));
+            material('stickBall', () => new THREE.MeshStandardMaterial({color:0xc62d36,roughness:.24})));
         top.position.y = .09; this.stickPivot.add(shaft,top); panel.add(this.stickPivot);
-        this.buttons = [];
-        const addButton=(x,z,color,keys,small=false)=>{
-            const radius=small?.021:.028;
-            const bezel=new THREE.Mesh(geometry('bezel'+small,()=>new THREE.CylinderGeometry(radius+.005,radius+.007,.012,24)),dark);
-            bezel.position.set(x,.009,z); panel.add(bezel);
-            const mat=new THREE.MeshStandardMaterial({color,roughness:.26,emissive:color,emissiveIntensity:this.broken?0:.10});
-            const cap=new THREE.Mesh(geometry('cap'+small,()=>new THREE.CylinderGeometry(radius*.93,radius,.012,24)),mat);
-            cap.position.set(x,.019,z);cap.userData.keys=keys;cap.userData.restY=.019;panel.add(cap);this.buttons.push(cap);
-        };
+        // Buttons: six game buttons plus small START and PAUSE. Bezels are
+        // plain shared meshes (batched); the caps are one instanced mesh.
+        const layout = [];
         const colors=[this.color,'#e4b84a','#3a8fbb','#c34243','#637abb','#479879'];
         const bindings=[['Space'],['KeyC'],['KeyX'],['KeyZ'],['Digit1'],['Digit2','Digit3']];
-        for(let i=0;i<6;i++)addButton(.05+(i%3)*.105,(i<3?.065:-.035)-(i%3)*.012,colors[i],bindings[i]);
-        addButton(-.28,-.17,'#e3e0cc',['Enter','NumpadEnter'],true);
-        addButton(-.15,-.17,'#a8abb3',['KeyP'],true);
+        for(let i=0;i<6;i++) layout.push({ x:.05+(i%3)*.105, z:(i<3?.065:-.035)-(i%3)*.012, color:colors[i], keys:bindings[i], small:false });
+        layout.push({ x:-.28, z:-.17, color:'#e3e0cc', keys:['Enter','NumpadEnter'], small:true });
+        layout.push({ x:-.15, z:-.17, color:'#a8abb3', keys:['KeyP'], small:true });
+
+        const caps = new THREE.InstancedMesh(
+            geometry('cap', () => new THREE.CylinderGeometry(CAP_RADIUS*.93, CAP_RADIUS, .012, 24)),
+            material('cap', capMaterial),
+            layout.length,
+        );
+        const glow = new Float32Array(layout.length).fill(this.broken ? 0 : .10);
+        caps.geometry = caps.geometry.clone(); // instance attributes are per cabinet
+        caps.geometry.setAttribute('instanceGlow', new THREE.InstancedBufferAttribute(glow, 1));
+        const dummy = new THREE.Object3D();
+        const tint = new THREE.Color();
+        this.buttons = layout.map(({ x, z, color, keys, small }, i) => {
+            const radius = small ? .021 : CAP_RADIUS;
+            const bezel=new THREE.Mesh(geometry('bezel'+small,()=>new THREE.CylinderGeometry(radius+.005,radius+.007,.012,24)),dark);
+            bezel.position.set(x,.009,z); panel.add(bezel);
+            dummy.position.set(x, CAP_REST_Y, z);
+            dummy.scale.set(radius / CAP_RADIUS, 1, radius / CAP_RADIUS);
+            dummy.updateMatrix();
+            caps.setMatrixAt(i, dummy.matrix);
+            caps.setColorAt(i, tint.set(color));
+            return { keys, down: false, matrix: dummy.matrix.clone() };
+        });
+        caps.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        panel.add(caps);
+        this.caps = caps;
         for(const x of [-.365,.365])for(const z of [-.19,.19]){
             const screw=new THREE.Mesh(geometry('panelScrew',()=>new THREE.CylinderGeometry(.005,.005,.003,10)),chrome);
             screw.position.set(x,.004,z);panel.add(screw);
@@ -390,20 +454,38 @@ export default class Cabinet {
         this.group.add(sign);
     }
 
-    computeBounds() {
-        // Axis-aligned footprint in world space for player collision.
+    // Axis-aligned world-space footprint of a cabinet standing at `position`
+    // facing `rotationY` (player collision and lightmap shadows).
+    static footprint(position, rotationY) {
+        const m = cabinetMatrix(position, rotationY);
         const corners = [
             new THREE.Vector3(-CABINET_HALF_WIDTH, 0, 0),
             new THREE.Vector3(CABINET_HALF_WIDTH, 0, 0),
             new THREE.Vector3(-CABINET_HALF_WIDTH, 0, CABINET_DEPTH),
             new THREE.Vector3(CABINET_HALF_WIDTH, 0, CABINET_DEPTH),
-        ].map((v) => v.applyMatrix4(this.group.matrixWorld));
-        this.bounds = {
+        ].map((v) => v.applyMatrix4(m));
+        return {
             minX: Math.min(...corners.map((c) => c.x)),
             maxX: Math.max(...corners.map((c) => c.x)),
             minZ: Math.min(...corners.map((c) => c.z)),
             maxZ: Math.max(...corners.map((c) => c.z)),
         };
+    }
+
+    // The screen's spill light as the lightmap bake needs it, for a cabinet
+    // that hasn't been built yet.
+    static spillLight(position, rotationY, color) {
+        return {
+            position: SPILL.position.clone().applyMatrix4(cabinetMatrix(position, rotationY)),
+            color,
+            intensity: SPILL.intensity,
+            distance: SPILL.distance,
+            decay: SPILL.decay,
+        };
+    }
+
+    computeBounds() {
+        this.bounds = Cabinet.footprint(this.group.position, this.group.rotation.y);
         this.screenWorldCenter = this.screen.getWorldPosition(new THREE.Vector3());
         this.boundingSphere = new THREE.Sphere(this.group.localToWorld(new THREE.Vector3(0, 1, 0.6)), 1.2);
         // Point in front of the machine used for "can I use this?" checks.
@@ -520,7 +602,7 @@ export default class Cabinet {
         // Screen spill light with a slight CRT shimmer. (Sampling the actual
         // screen colour would need a GPU readback, which stalls the frame.)
         if (!this.broken) {
-            this.light.intensity = 0.38 * (0.98 + 0.02 * Math.sin(this.time * 7.3) * Math.sin(this.time * 2.1));
+            this.light.intensity = SPILL.intensity * (0.98 + 0.02 * Math.sin(this.time * 7.3) * Math.sin(this.time * 2.1));
         }
 
         // Joystick and buttons mirror the player's input.
@@ -528,10 +610,25 @@ export default class Cabinet {
         this.stick.y += (this.input.y - this.stick.y) * Math.min(1, dt * 20);
         this.stickPivot.rotation.z = -this.stick.x * 0.35;
         this.stickPivot.rotation.x = -this.stick.y * 0.35;
-        for (const button of this.buttons) {
-            const down = this.active && button.userData.keys.some(key => this.controlKeys.has(key));
-            button.position.y = button.userData.restY - (down ? .005 : 0);
-            button.material.emissiveIntensity = this.broken ? 0 : down ? .3 : .10;
+        // Buttons sink and glow while their key is held. Only the machine
+        // being played can change, so this is free for the others.
+        if (this.active || this.buttonsDirty) {
+            this.buttonsDirty = false;
+            const glow = this.caps.geometry.attributes.instanceGlow;
+            this.buttons.forEach((button, i) => {
+                const down = this.active && button.keys.some(key => this.controlKeys.has(key));
+                if (down === button.down) return;
+                button.down = down;
+                this.buttonsDirty = true;
+                this.caps.setMatrixAt(i, button.matrix);
+                if (down) this.caps.instanceMatrix.array[i * 16 + 13] -= CAP_TRAVEL; // translation y
+                glow.setX(i, this.broken ? 0 : down ? .3 : .10);
+            });
+            if (this.buttonsDirty) {
+                this.caps.instanceMatrix.needsUpdate = true;
+                glow.needsUpdate = true;
+                this.buttonsDirty = this.active; // a released machine settles on its next update
+            }
         }
 
         if (this.broken) {

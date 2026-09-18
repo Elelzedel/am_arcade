@@ -23,14 +23,14 @@ export function createAtmosphere(scene, { room }) {
     group.add(aisle.group, street.group, beams.group, dust.group);
     scene.add(group);
 
+    // Renders the aisle mirror; called by the host right before the frame.
     // Dust motes are sized in pixels and the mirror renders at a different
     // resolution, so they are left out of the reflection.
-    const reflect = aisle.reflector.onBeforeRender;
-    aisle.reflector.onBeforeRender = function (renderer, target, camera) {
+    function renderReflection(renderer, camera) {
         dust.group.visible = false;
-        reflect.call(this, renderer, target, camera);
+        aisle.render(renderer, scene, camera);
         dust.group.visible = true;
-    };
+    }
 
     let cabinets = [];
     // The host passes no camera (room.update(dt)); fall back to the one in the scene.
@@ -76,5 +76,5 @@ export function createAtmosphere(scene, { room }) {
         aisle.setEnabled(reflections && focus < 0.85);
     }
 
-    return { group, addCabinets, update, setQuality, beams, dust, aisle, street };
+    return { group, addCabinets, update, renderReflection, setQuality, beams, dust, aisle, street };
 }

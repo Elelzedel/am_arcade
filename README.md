@@ -63,6 +63,9 @@ arcade-environment/     the 3D room
   src/atmosphere.js     light shafts, dust, reflective aisle, the rainy street outside
   src/audioReactive.js  taps the master bus so visuals can pulse with the music
   src/cabinet.js        cabinet model, CRT screen shader, marquee, controls, game hosting
+  src/lightmap.js       baked lighting for the room's big surfaces (workers + lightmapKernel.js)
+  src/staticBatch.js    merges everything that never moves into a few draw calls
+  src/quality.js        quality tiers and the frame-rate governor
   src/player.js         first-person movement and collision
   src/hud.js            DOM overlays (intro, pause, prompts)
   src/ambience.js       room tone and footsteps
@@ -77,6 +80,7 @@ games/
   shared/               framework every game builds on (see games/README.md); art.js and icons.js hold the shared artwork
   tank-game/  neon-racer/  star-swarm/  brick-blitz/  neon-snake/
 scripts/shot.mjs        headless Chromium playtest/screenshot helper
+scripts/profile.mjs     CPU profile of the load and of walking around
 ```
 
 Adding a game? See [games/README.md](games/README.md).
@@ -103,17 +107,36 @@ debug handles: `window.game` and `window.arcade` (which includes
 
 ## Performance
 
-The room is fill-rate bound (nineteen point lights, additive light beams,
-bloom, a mirrored aisle and the CRT shader), so `arcade-environment/src/quality.js`
-defines five tiers that scale those: render resolution and a pixel budget,
-MSAA, bloom size, the aisle reflection, how many lights are on
-(`light.userData.priority`: 0 essential, 1 mood, 2 luxury), beams, dust, CRT
-shader detail and how often attract-mode screens refresh. A governor picks a
-starting tier from the GPU and device, steps down as soon as the frame rate
-falls clearly under 60, and steps back up (cautiously, with back-off) when
-frames have been pinned to the display for a while. The tier it settles on is
-remembered in localStorage. `SOFTWARE_GL=1 node scripts/shot.mjs …` runs the
-headless playtest on SwiftShader, a handy stand-in for a very weak GPU.
+The room is built to be cheap to draw without giving anything up:
+
+- **Baked lighting.** The floor, ceiling and walls are lit by lightmaps
+  (`lightmap.js`, kernel in `lightmapKernel.js`) computed in Web Workers while
+  the page loads, using three.js's own light falloff plus soft shadows from
+  the machines and furniture. Those planes cover most of the screen and now
+  cost two texture taps a pixel instead of a loop over eighteen point lights.
+- **Static batching.** After a short simulated run-in, everything that never
+  moved is merged into one mesh per material and the rest gets its matrices
+  frozen (`staticBatch.js`). Parts that only move on input carry
+  `userData.dynamic = true`. Cabinet button caps are one instanced mesh per
+  machine, the street outside is two draw calls, rain falls in a vertex shader.
+- **One render state.** The aisle mirror renders as its own top-level pass
+  (not nested in `onBeforeRender`), and shaders are compiled once, against the
+  buffer they actually draw into.
+- **Quality tiers.** `quality.js` defines five tiers that scale render
+  resolution and a pixel budget, MSAA, bloom size, the mirror, how many lights
+  reach the dynamic objects (`light.userData.priority`: 0 essential, 1 mood,
+  2 luxury), light shafts, dust, CRT shader detail and how often attract-mode
+  screens refresh. A governor picks a starting tier from the GPU and device,
+  steps down as soon as the frame rate falls clearly under 60, and steps back
+  up (cautiously, with back-off) once frames have been pinned to the display
+  for a while. The settled tier is remembered in localStorage.
+
+Measuring: `?inputdebug` shows the tier and frame time, `arcade.benchmark(n,
+finish)` times a frame on the CPU (and GPU with `finish`),
+`node scripts/profile.mjs http://localhost:8080/?nolock` prints a sampling
+profile of the load and a few seconds of walking, and
+`SOFTWARE_GL=1 node scripts/shot.mjs …` runs the headless playtest on
+SwiftShader, a handy stand-in for a very weak GPU.
 
 ## Credits
 
