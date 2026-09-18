@@ -39,3 +39,4 @@ Thumbs.db
 
 # Blender Backups
 *.blend1
+.wrangler/

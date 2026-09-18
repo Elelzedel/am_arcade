@@ -17,7 +17,12 @@ jukebox's records, the cat) is synthesized with WebAudio.
 npm install
 npm run dev      # opens http://localhost:8080
 npm run build    # production build in dist/
+npm run deploy   # build, then publish dist/ to the am-arcade Worker (am-arcade.com)
 ```
+
+It's a static site: the Cloudflare Worker (`wrangler.jsonc`) only serves the
+files in `dist/` from the edge; everything else runs in the visitor's
+browser.
 
 ## Things to do there
 

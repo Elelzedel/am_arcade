@@ -1,0 +1,14 @@
+// AM Arcade is a static site: the Worker only serves the webpack build in
+// dist/ from Cloudflare's edge. Deploy with `npm run deploy`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "am-arcade",
+  "account_id": "b178d2119a5f1ed1ed23d8fadc7a90e4",
+  "compatibility_date": "2026-09-18",
+  "assets": {
+    "directory": "./dist"
+  },
+  "routes": [
+    { "pattern": "am-arcade.com", "custom_domain": true }
+  ]
+}
