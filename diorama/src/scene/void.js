@@ -4,7 +4,7 @@ import { P } from '../palette.js';
 // The night the diorama floats in: a screen-space glow that always sits
 // behind the model (so it reads as a spotlight on a stage, from any angle),
 // sparse stars that stay put in the world as the camera swings, and a slow
-// drift of haze.
+// drift of haze. Arithmetic hashes only; it covers most of the screen.
 export function createVoid(scene) {
     const material = new THREE.ShaderMaterial({
         side: THREE.BackSide,
@@ -32,15 +32,20 @@ export function createVoid(scene) {
             uniform vec3 deep, mid, glow;
             varying vec3 vDir;
 
-            float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+            float hash3(vec3 p) {
+                p = fract(p * 0.1031);
+                p += dot(p, p.zyx + 31.32);
+                return fract((p.x + p.y) * p.z);
+            }
+            float hash2(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
+            }
             float noise(vec2 p) {
                 vec2 i = floor(p), f = fract(p);
                 f = f * f * (3.0 - 2.0 * f);
-                float a = fract(sin(dot(i, vec2(12.9898, 78.233))) * 43758.5453);
-                float b = fract(sin(dot(i + vec2(1, 0), vec2(12.9898, 78.233))) * 43758.5453);
-                float c = fract(sin(dot(i + vec2(0, 1), vec2(12.9898, 78.233))) * 43758.5453);
-                float d = fract(sin(dot(i + vec2(1, 1), vec2(12.9898, 78.233))) * 43758.5453);
-                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                return mix(mix(hash2(i), hash2(i + vec2(1, 0)), f.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), f.x), f.y);
             }
 
             void main() {
@@ -52,16 +57,16 @@ export function createVoid(scene) {
 
                 // drifting haze
                 float h = noise(d * 2.2 + vec2(time * 0.012, -time * 0.008));
-                h += 0.5 * noise(d * 5.0 - vec2(time * 0.02, 0.0));
-                col += glow * (h - 0.75) * 0.08;
+                col += glow * (h - 0.5) * 0.09;
 
                 // stars, fixed to the world
                 vec3 cell = floor(vDir * 180.0);
-                float s = hash(cell);
-                float star = step(0.9965, s);
-                vec3 f = fract(vDir * 180.0) - 0.5;
-                float tw = 0.6 + 0.4 * sin(time * (1.0 + s * 3.0) + s * 40.0);
-                col += vec3(0.8, 0.8, 1.0) * star * smoothstep(0.35, 0.0, length(f)) * tw * 0.55 * smoothstep(0.25, 0.8, r);
+                float s = hash3(cell);
+                if (s > 0.9965) {
+                    vec3 f = fract(vDir * 180.0) - 0.5;
+                    float tw = 0.6 + 0.4 * sin(time * (1.0 + s * 3.0) + s * 40.0);
+                    col += vec3(0.8, 0.8, 1.0) * smoothstep(0.35, 0.0, length(f)) * tw * 0.55 * smoothstep(0.25, 0.8, r);
+                }
 
                 gl_FragColor = vec4(col * mix(0.55, 1.0, power), 1.0);
             }

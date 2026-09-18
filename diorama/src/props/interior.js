@@ -11,13 +11,17 @@ export function createRocketRide(scene, { position, rotationY = 0 }) {
     // base: a round plinth with a coin box
     add(root, new THREE.CylinderGeometry(0.52, 0.56, 0.16, 40), mat('#2b2a52', { rough: 0.5, metal: 0.3 }), { p: [0, 0.08, 0] });
     add(root, new THREE.CylinderGeometry(0.5, 0.5, 0.02, 40), mat('#d9d2e8', { rough: 0.25, metal: 0.9 }), { p: [0, 0.17, 0] });
-    const bulbs = [];
+    // sixteen bulbs round the rim, one draw call between them
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff' }), 16);
+    const bulbColor = [];
     for (let i = 0; i < 16; i++) {
         const a = (i / 16) * Math.PI * 2;
-        const m = glowMat(i % 2 ? P.amber : P.pink, 0.2);
-        add(root, new THREE.SphereGeometry(0.018, 8, 6), m, { p: [Math.cos(a) * 0.54, 0.09, Math.sin(a) * 0.54], cast: false });
-        bulbs.push(m);
+        bulbs.setMatrixAt(i, new THREE.Matrix4().makeTranslation(Math.cos(a) * 0.54, 0.09, Math.sin(a) * 0.54));
+        bulbColor.push(new THREE.Color(i % 2 ? P.amber : P.pink));
+        bulbs.setColorAt(i, new THREE.Color(0, 0, 0));
     }
+    root.add(bulbs);
+    const tmp = new THREE.Color();
     const box = group(root, { p: [0.36, 0.17, 0.36], r: [0, Math.PI / 4, 0] });
     add(box, rbox(0.18, 0.34, 0.14, 0.02, 2), mat('#c92f4f', { rough: 0.35 }), { p: [0, 0.17, 0] });
     const label = canvasTexture(128, 128, (ctx, w, h) => {
@@ -82,7 +86,7 @@ export function createRocketRide(scene, { position, rotationY = 0 }) {
     let level = 0;
     power.add(1.2, (v) => { level = v; setGlow(portGlow, 1.2 * v); });
     const hits = [];
-    root.traverse((o) => { if (o.isMesh) hits.push(o); });
+    root.traverse((o) => { if (o.isMesh && !o.isInstancedMesh) hits.push(o); });
     const state = { ride: 0 };
     return {
         root,
@@ -98,15 +102,36 @@ export function createRocketRide(scene, { position, rotationY = 0 }) {
             flameMat.opacity = k * (0.7 + 0.3 * Math.sin(time * 40));
             flame.scale.set(1, 0.7 + 0.5 * Math.abs(Math.sin(time * 23)), 1);
             flame.visible = k > 0.01;
-            bulbs.forEach((b, i) => {
+            for (let i = 0; i < 16; i++) {
                 const chase = k > 0 ? (Math.floor(time * 12) + i) % 4 === 0 : (i % 2 === Math.floor(time * 0.8) % 2);
-                setGlow(b, level * (chase ? 3 : 0.35));
-            });
+                bulbs.setColorAt(i, tmp.copy(bulbColor[i]).multiplyScalar(level * (chase ? 3 : 0.35)));
+            }
+            bulbs.instanceColor.needsUpdate = true;
         },
     };
 }
 
 // ---- plants -------------------------------------------------------------------------
+
+// one leaf material for every plant, so their leaves can share a draw call
+let leaves = null;
+function leafMaterial() {
+    if (!leaves) {
+        const leafTex = canvasTexture(64, 256, (ctx, w, h) => {
+            const g = ctx.createLinearGradient(0, 0, w, 0);
+            g.addColorStop(0, '#d9c65a');
+            g.addColorStop(0.12, '#2f6b45');
+            g.addColorStop(0.88, '#2f6b45');
+            g.addColorStop(1, '#d9c65a');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = 'rgba(160, 220, 170, 0.25)';
+            for (let y = 10; y < h; y += 18) ctx.fillRect(8, y, w - 16, 5);
+        });
+        leaves = new THREE.MeshStandardMaterial({ map: leafTex, roughness: 0.6, side: THREE.DoubleSide });
+    }
+    return leaves;
+}
 
 export function createSnakePlant(scene, { position, scale = 1 }) {
     const root = group(scene, { p: position, name: 'plant' });
@@ -115,18 +140,7 @@ export function createSnakePlant(scene, { position, scale = 1 }) {
     add(root, new THREE.TorusGeometry(0.17, 0.02, 8, 24), mat('#b35f3d', { rough: 0.8 }), { p: [0, 0.34, 0], r: [Math.PI / 2, 0, 0] });
     add(root, new THREE.CylinderGeometry(0.155, 0.155, 0.02, 24), mat('#2a1b1a', { rough: 1 }), { p: [0, 0.32, 0] });
     const rand = rng(31);
-    const leafTex = canvasTexture(64, 256, (ctx, w, h) => {
-        const g = ctx.createLinearGradient(0, 0, w, 0);
-        g.addColorStop(0, '#d9c65a');
-        g.addColorStop(0.12, '#2f6b45');
-        g.addColorStop(0.88, '#2f6b45');
-        g.addColorStop(1, '#d9c65a');
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = 'rgba(160, 220, 170, 0.25)';
-        for (let y = 10; y < h; y += 18) ctx.fillRect(8, y, w - 16, 5);
-    });
-    const leafMat = new THREE.MeshStandardMaterial({ map: leafTex, roughness: 0.6, side: THREE.DoubleSide });
+    const leafMat = leafMaterial();
     for (let i = 0; i < 9; i++) {
         const hgt = 0.45 + rand() * 0.45;
         const shape = new THREE.Shape();

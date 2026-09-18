@@ -4,6 +4,7 @@ import { FONTS } from '../fonts.js';
 import { add, group, mat, glowMat, rbox, canvasTexture, damp } from '../util.js';
 import { power } from '../power.js';
 import { jukebox, TRACKS } from '../audio/music.js';
+import { lightSpill } from './neon.js';
 
 // A tombstone-shaped jukebox in walnut and chrome: colour-shifting tubes up
 // the arch, bubble tubes either side, and the record itself turning behind
@@ -156,9 +157,10 @@ export function createJukebox(scene, { position, rotationY }) {
     }
 
     // light it throws into the room
-    const glow = new THREE.PointLight('#ff9a6b', 0, 2.8, 1.8);
-    glow.position.set(0, 0.9, 0.7);
-    root.add(glow);
+    const glow = lightSpill('#ff9a6b', 1.6, 1.4, 0.3);
+    glow.mesh.rotation.x = -Math.PI / 2;
+    glow.mesh.position.set(0, 0.008, 0.7);
+    root.add(glow.mesh);
 
     let level = 0;
     power.add(1.0, (v) => { level = v; });
@@ -184,7 +186,7 @@ export function createJukebox(scene, { position, rotationY }) {
             spin = damp(spin, playing ? 1 : 0, 1.5, dt);
             disc.rotation.z -= spin * dt * (33.3 / 60) * Math.PI * 2;
             arm.rotation.z = damp(arm.rotation.z, playing ? 0.32 : 0, 3, dt);
-            glow.intensity = level * (0.5 + beat * 0.8);
+            glow.setLevel(level * (0.7 + beat * 0.8));
         },
     };
 }

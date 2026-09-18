@@ -277,6 +277,16 @@ class Sfx {
         o.stop(t + seconds + 0.1);
     }
 
+    // a footstep: a soft thud, splashier out in the wet
+    step(intensity = 0.5, inside = false) {
+        if (!this.ctx || this.muted) return;
+        const level = 0.035 + intensity * 0.04;
+        this.tone(inside ? 95 : 120, { peak: level, a: 0.004, r: 0.07, to: 60 });
+        this.noiseBurst(inside
+            ? { type: 'lowpass', freq: 900, peak: level * 0.8, a: 0.003, r: 0.06 }
+            : { type: 'bandpass', freq: 2600, q: 0.8, peak: level * 1.2, a: 0.004, r: 0.12 });
+    }
+
     honk() {
         for (const [f, t] of [[392, 0], [494, 0], [392, 0.22], [494, 0.22]]) this.tone(f, { type: 'square', t, peak: 0.035, a: 0.01, r: 0.16 });
     }

@@ -60,7 +60,8 @@
       #enter:active { transform: translateY(1px) scale(0.99); }
       #enter:focus-visible, .tool:focus-visible, #back:focus-visible { outline: 2px solid rgba(255, 230, 245, 0.7); outline-offset: 4px; }
       button:focus:not(:focus-visible) { outline: none; }
-      #enter .coin { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6c9, #ffc34d 55%, #c77d12); box-shadow: 0 0 0 2px rgba(0,0,0,0.12) inset; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #7a4a06; }
+      #enter .arrow { width: 18px; height: 18px; transition: transform 0.35s var(--ease); }
+      #enter:hover .arrow { transform: translateX(3px); }
       #loader .fine { position: absolute; bottom: 28px; left: 0; right: 0; font-size: 12px; color: rgba(169,160,200,0.7); letter-spacing: 0.05em; }
       @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       @keyframes ignite { 0% { opacity: 0; } 8% { opacity: 1; } 11% { opacity: 0.1; } 16% { opacity: 1; } 19% { opacity: 0.3; } 24%, 100% { opacity: 1; } }
@@ -96,6 +97,22 @@
       @keyframes spin { to { transform: rotate(360deg); } }
 
       /* ---- hover label ------------------------------------------------------------ */
+      .tool.wide { width: auto; border-radius: 999px; padding: 0 12px 0 13px; display: inline-flex; gap: 8px; font-size: 13px; font-weight: 600; }
+      .tool.wide kbd { height: 20px; min-width: 20px; opacity: 0.75; }
+      body.touch .tool.wide { display: none; }
+      #walkhint {
+        bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; padding: 10px 16px; border-radius: 999px;
+        background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 12.5px; color: var(--muted); white-space: nowrap; pointer-events: none;
+      }
+      #walkhint span { display: inline-flex; gap: 4px; align-items: center; }
+      #walkhint kbd { margin-right: 2px; }
+      #walkhint i { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.25); }
+      #crosshair {
+        position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; z-index: 15; pointer-events: none;
+        background: rgba(255, 244, 250, 0.85); box-shadow: 0 0 0 1.5px rgba(10, 6, 24, 0.5), 0 0 10px rgba(255, 180, 220, 0.6);
+        transition: transform 0.2s var(--ease), background 0.2s, opacity 0.3s;
+      }
+      body.hovering #crosshair { transform: scale(1.9); background: #ffd9a3; }
       #label {
         position: fixed; z-index: 30; left: 0; top: 0; pointer-events: none; padding: 10px 14px 11px; border-radius: 12px; min-width: 150px;
         background: rgba(14, 9, 30, 0.78); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -174,7 +191,7 @@
         <div class="script">open 'til four</div>
         <div class="progress"><i></i></div>
         <div class="status">sweeping the floor&hellip;</div>
-        <button id="enter" class="hidden" inert><span class="coin">¢</span>Step inside</button>
+        <button id="enter" class="hidden" inert>Step inside<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
       </div>
       <div class="fine">best with sound &nbsp;·&nbsp; headphones on</div>
     </div>
@@ -184,6 +201,7 @@
       <div class="sub">open 'til four &nbsp;·&nbsp; it's <b id="clock">2:00 AM</b></div>
     </div>
     <div id="tools" class="hud hidden" inert>
+      <button class="tool wide" id="view" aria-label="Switch between the overview and walking about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4.5" r="1.8"/><path d="M9 21l2.2-6.5L14 17v4M11.2 14.5l1-5.2 3 2.7 2.8.8M12.2 9.3 9 10.8 7.5 14"/></svg><span>Walk in</span><kbd>V</kbd></button>
       <button class="tool" id="sound" aria-label="Toggle sound"><div class="bars on"><i></i><i></i><i></i><i></i></div></button>
       <button class="tool" id="helpBtn" aria-label="About and controls">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.3"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/></svg>
@@ -194,6 +212,13 @@
       <span class="desk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v3"/></svg>scroll to lean in</span><i class="desk"></i>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v9l-2-2-2 2 5 7h7l2-8-6-1V3z"/></svg>tap anything that glows</span>
     </div>
+    <div id="walkhint" class="hud hidden" inert>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>walk</span><i></i>
+      <span><kbd>SHIFT</kbd>hurry</span><i></i>
+      <span><kbd>CLICK</kbd>look around, then use</span><i></i>
+      <span><kbd>V</kbd>back to the overview</span>
+    </div>
+    <div id="crosshair" class="hidden" aria-hidden="true"></div>
     <div id="nowplaying" class="hud hidden" inert><div class="disc"></div><div><b id="npTitle">Night Shift</b><span id="npArtist">the Tokens</span></div></div>
 
     <div id="label" class="hidden" aria-hidden="true"><div class="title"><i></i><span></span></div><div class="sub"></div></div>
@@ -225,6 +250,7 @@
           <dt><kbd>SCROLL</kbd></dt><dd>lean in, lean out</dd>
           <dt><kbd>CLICK</kbd></dt><dd>play a machine, pet the cat, feed the jukebox</dd>
           <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>walk straight up to a machine</dd>
+          <dt><kbd>V</kbd></dt><dd>step down and walk about (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, mouse to look, <kbd>E</kbd> to use)</dd>
           <dt><kbd>ESC</kbd></dt><dd>step back from a machine</dd>
           <dt><kbd>M</kbd></dt><dd>sound on / off</dd>
         </dl>

@@ -10,6 +10,7 @@ export default class Interface {
             progress: document.querySelector('#loader .progress'), enter: $('enter'),
             brand: $('brand'), clock: $('clock'), tools: $('tools'), sound: $('sound'), helpBtn: $('helpBtn'), help: $('help'),
             hint: $('hint'), nowplaying: $('nowplaying'), npTitle: $('npTitle'), npArtist: $('npArtist'),
+            view: $('view'), walkhint: $('walkhint'), crosshair: $('crosshair'),
             label: $('label'), back: $('back'), gametitle: $('gametitle'), controls: $('controls'), toast: $('toast'), pad: $('pad'),
         };
         this.isReady = false;
@@ -27,6 +28,8 @@ export default class Interface {
         this.el.back.addEventListener('click', () => this.onBack?.());
         this.el.sound.addEventListener('click', () => this.toggleMute());
         this.el.helpBtn.addEventListener('click', () => this.showHelp(true));
+        this.el.view.addEventListener('click', () => this.onView?.());
+        this.onView = null;
         this.el.help.addEventListener('click', () => this.showHelp(false));
 
         const touch = matchMedia('(pointer: coarse)').matches;
@@ -72,10 +75,15 @@ export default class Interface {
             el.inert = !on;
         };
         const explore = mode === 'explore';
+        const walking = mode === 'walk';
         const playing = mode === 'playing';
         show(this.el.loader, mode === 'title');
-        show(this.el.brand, explore);
-        show(this.el.tools, explore || playing);
+        show(this.el.brand, explore || walking);
+        show(this.el.tools, explore || walking || playing);
+        show(this.el.walkhint, walking);
+        this.el.crosshair.classList.toggle('hidden', !walking);
+        this.el.view.style.display = playing ? 'none' : '';
+        this.el.view.querySelector('span').textContent = walking ? 'Overview' : 'Walk in';
         show(this.el.nowplaying, explore && this.nowTrack);
         show(this.el.back, playing);
         show(this.el.gametitle, playing);

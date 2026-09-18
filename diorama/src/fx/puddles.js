@@ -104,14 +104,26 @@ export function createPuddles(scene, { puddles, y = 0.013, resolution = 0.5 }) {
     const reflect = mirror.onBeforeRender;
     mirror.onBeforeRender = () => {};
     scene.add(mirror);
+    let frame = 0;
+    let every = 1;
+    const resize = () => mirror.getRenderTarget().setSize(Math.max(2, Math.round(window.innerWidth * resolution)), Math.max(2, Math.round(window.innerHeight * resolution)));
+    window.addEventListener('resize', resize);
     return {
         mirror,
         render(renderer, camera, time) {
             mirror.material.uniforms.time.value = time;
-            reflect.call(mirror, renderer, scene, camera);
+            if (!mirror.visible) return;
+            // the reflection itself can lag a frame or two; the ripples never do
+            if (frame++ % every === 0) reflect.call(mirror, renderer, scene, camera);
         },
-        resize(width, height) {
-            mirror.getRenderTarget().setSize(Math.round(width * resolution), Math.round(height * resolution));
+        /** scale 0 turns the reflections off (and the puddles with them). */
+        setQuality(scale, redrawEvery = 1) {
+            mirror.visible = scale > 0;
+            every = redrawEvery;
+            if (scale > 0) {
+                resolution = scale;
+                resize();
+            }
         },
     };
 }

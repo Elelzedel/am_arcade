@@ -4,6 +4,7 @@ import { ROOM, WALK } from '../layout.js';
 import { FONTS } from '../fonts.js';
 import { add, group, mat, glowMat, setGlow, rbox, canvasTexture, roundRect, rng, damp, easeOutBack } from '../util.js';
 import { power } from '../power.js';
+import { lightSpill } from './neon.js';
 
 const allMeshes = (root, skip = []) => {
     const out = [];
@@ -173,10 +174,11 @@ export function createVendingMachine(scene, { position, rotationY }) {
     add(root, rbox(W * 0.62, 0.2, 0.03, 0.02, 2), mat('#150f19', { rough: 0.8 }), { p: [-W * 0.12, 0.3, D / 2 + 0.002] });
     const flap = add(root, new THREE.PlaneGeometry(W * 0.58, 0.17), mat('#3a3346', { rough: 0.2, metal: 0.4 }), { p: [-W * 0.12, 0.3, D / 2 + 0.02], cast: false, dynamic: true });
 
-    const glow = new THREE.PointLight('#ffe7d4', 0, 2.4, 1.8);
-    glow.position.set(0, 1.2, D / 2 + 0.5);
-    root.add(glow);
-    power.add(-1.2, (v) => { windowMat.emissiveIntensity = 0.3 * v; glow.intensity = 1.0 * v; }, { flicker: 0.6 });
+    const glow = lightSpill('#ffe7d4', 1.6, 1.3, 0.22);
+    glow.mesh.rotation.x = -Math.PI / 2;
+    glow.mesh.position.set(0, 0.006, D / 2 + 0.6);
+    root.add(glow.mesh);
+    power.add(-1.2, (v) => { windowMat.emissiveIntensity = 0.3 * v; glow.setLevel(v); }, { flicker: 0.6 });
 
     // cans that come out, then roll away out of sight
     const cans = [];
@@ -463,11 +465,15 @@ export function createStringLights(scene, { anchors, sag = 0.2, spacing = 0.3, c
     };
 }
 
-export function createOpenSign(scene, { position, rotationY }) {
-    const root = group(scene, { p: position, r: [0, rotationY, 0], name: 'open-sign' });
+// The OPEN sign stands on its own post by the door: anything fixed to the
+// building's walls would fold away with them.
+export function createOpenSign(scene, { position, rotationY, lift = 1.25 }) {
+    const base = group(scene, { p: position, r: [0, rotationY, 0], name: 'open-sign' });
+    const steel = mat('#2c2840', { rough: 0.5, metal: 0.7 });
+    add(base, new THREE.CylinderGeometry(0.16, 0.2, 0.05, 20), steel, { p: [0, 0.025, 0] });
+    add(base, new THREE.CylinderGeometry(0.025, 0.025, lift, 10), steel, { p: [0, lift / 2, 0] });
+    const root = group(base, { p: [0, lift, 0] });
     add(root, rbox(0.9, 0.38, 0.03, 0.02, 2), mat('#120c1c', { rough: 0.4 }), { p: [0, 0.19, 0] });
-    add(root, rbox(0.03, 0.08, 0.2, 0.01, 1), mat('#2c2840', { rough: 0.5, metal: 0.7 }), { p: [-0.3, -0.03, -0.05] });
-    add(root, rbox(0.03, 0.08, 0.2, 0.01, 1), mat('#2c2840', { rough: 0.5, metal: 0.7 }), { p: [0.3, -0.03, -0.05] });
     const open = canvasTexture(512, 220, (ctx, w, h) => {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, w, h);
@@ -496,6 +502,64 @@ export function createOpenSign(scene, { position, rotationY }) {
     });
     const m = new THREE.MeshBasicMaterial({ map: open, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, color: new THREE.Color(2, 2, 2) });
     add(root, new THREE.PlaneGeometry(0.86, 0.36), m, { p: [0, 0.19, 0.017], cast: false });
+    add(root, new THREE.PlaneGeometry(0.86, 0.36), m, { p: [0, 0.19, -0.017], r: [0, Math.PI, 0], cast: false });
     power.add(0.1, (v) => m.color.setScalar(2 * v), { flicker: 0.5, stutter: 0.02 });
+    return { root: base };
+}
+
+// Round the back: a dumpster, a stack of crates, and a bike nobody's claimed.
+export function createAlley(scene, { dumpsterAt, cratesAt }) {
+    const root = group(scene, { name: 'alley' });
+    const green = new THREE.MeshPhysicalMaterial({ color: '#2d5b4f', roughness: 0.55, clearcoat: 0.3 });
+    const dark = mat('#1a1622', { rough: 0.6, metal: 0.4 });
+    const d = group(root, { p: dumpsterAt });
+    add(d, rbox(1.7, 0.95, 0.95, 0.04, 2), green, { p: [0, 0.6, 0] });
+    add(d, rbox(1.76, 0.05, 1.0, 0.02, 1), dark, { p: [0, 1.1, 0] });
+    add(d, rbox(0.86, 0.05, 1.0, 0.02, 1), mat('#23453c', { rough: 0.6 }), { p: [-0.43, 1.2, -0.12], r: [0.25, 0, 0] });
+    for (const x of [-0.7, 0.7]) for (const z of [-0.35, 0.35]) {
+        add(d, new THREE.CylinderGeometry(0.06, 0.06, 0.06, 12), dark, { p: [x, 0.07, z], r: [Math.PI / 2, 0, 0] });
+    }
+    // a strip of stencilled lettering
+    const tag = canvasTexture(256, 64, (ctx, w, h) => {
+        ctx.fillStyle = '#2d5b4f';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#e8e0cc';
+        ctx.font = `800 34px ${FONTS.ui}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('NO PARKING', w / 2, 44);
+    });
+    add(d, new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshStandardMaterial({ map: tag, roughness: 0.6 }), { p: [0, 0.75, 0.478], cast: false });
+    // crates, stacked a little carelessly
+    const wood = mat('#7a5438', { rough: 0.8 });
+    const slats = mat('#5e3f2a', { rough: 0.8 });
+    const crate = (p, r, s = 0.5) => {
+        const g = group(root, { p, r: [0, r, 0] });
+        add(g, rbox(s, s, s, 0.02, 1), wood, { p: [0, s / 2, 0] });
+        for (const y of [0.25, 0.75]) add(g, rbox(s + 0.01, 0.06, s + 0.01, 0.01, 1), slats, { p: [0, s * y, 0] });
+    };
+    const [cx, , cz] = cratesAt;
+    crate([cx, WALK.top, cz], 0.1);
+    crate([cx + 0.55, WALK.top, cz + 0.05], -0.2);
+    crate([cx + 0.25, WALK.top + 0.5, cz], 0.35);
+    // a cardboard box, sagging in the rain
+    add(root, rbox(0.45, 0.3, 0.35, 0.02, 1), mat('#9a7a55', { rough: 0.95 }), { p: [cx - 0.6, WALK.top + 0.15, cz + 0.2], r: [0, 0.4, 0.03] });
+    return { root };
+}
+
+// A squashy teal couch for people waiting their turn.
+export function createCouch(scene, { position, rotationY }) {
+    const root = group(scene, { p: position, r: [0, rotationY, 0], name: 'couch' });
+    const velvet = mat('#1f6f73', { rough: 0.85 });
+    const piping = mat('#e8b96a', { rough: 0.4, metal: 0.6 });
+    const L = 1.7;
+    add(root, rbox(L, 0.26, 0.72, 0.08, 3), velvet, { p: [0, 0.3, 0] });
+    for (const x of [-L / 4, L / 4]) add(root, rbox(L / 2 - 0.04, 0.14, 0.62, 0.07, 3), velvet, { p: [x, 0.5, 0.04] });
+    add(root, rbox(L, 0.5, 0.2, 0.09, 3), velvet, { p: [0, 0.66, -0.28], r: [-0.1, 0, 0] });
+    for (const x of [-L / 2 + 0.08, L / 2 - 0.08]) add(root, rbox(0.18, 0.42, 0.72, 0.08, 3), velvet, { p: [x, 0.48, 0] });
+    for (const x of [-L / 2 + 0.12, L / 2 - 0.12]) for (const z of [-0.26, 0.26]) {
+        add(root, new THREE.CylinderGeometry(0.025, 0.018, 0.17, 10), piping, { p: [x, 0.085, z] });
+    }
+    // a cushion someone left askew
+    add(root, rbox(0.34, 0.3, 0.12, 0.06, 3), mat('#ff8fb8', { rough: 0.9 }), { p: [L / 2 - 0.35, 0.68, -0.1], r: [-0.3, 0.3, 0.15] });
     return { root };
 }

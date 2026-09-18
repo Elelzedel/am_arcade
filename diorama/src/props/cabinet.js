@@ -4,6 +4,7 @@ import { LIVERY } from '../palette.js';
 import { FONTS } from '../fonts.js';
 import { add, group, mat, glowMat, setGlow, canvasTexture, roundRect, rbox, damp } from '../util.js';
 import { EMBLEMS, loadImage } from '../../../games/shared/art.js';
+import { lightSpill } from './neon.js';
 
 // An upright cabinet built from a single side profile, the way the real ones
 // were cut from plywood: two lacquered side panels with glowing T-molding,
@@ -488,9 +489,12 @@ export default class Cabinet {
         add(g, new THREE.PlaneGeometry(INNER, 0.1), black, { p: [0, 0.055, 0.2815], cast: false });
 
         // Light the screen throws on the floor and whoever stands there.
-        this.glow = new THREE.PointLight(livery.trim, 0, 2.6, 1.8);
-        this.glow.position.set(0, 1.3, 0.75);
-        g.add(this.glow);
+        // Light the screen throws on the carpet in front of it: a painted
+        // pool rather than a real light, so five machines cost nothing.
+        this.glow = lightSpill(livery.trim, 1.5, 1.3, 0.3);
+        this.glow.mesh.rotation.x = -Math.PI / 2;
+        this.glow.mesh.position.set(0, 0.008, 0.85);
+        g.add(this.glow.mesh);
     }
 
     // ---- camera -----------------------------------------------------------------
@@ -566,7 +570,7 @@ export default class Cabinet {
         setGlow(this.lipMat, this.power * (1.0 + this.hover));
         this.marqueeMat.color.setScalar(0.12 + this.power * (1.35 + this.hover * 0.5));
         this.coinMat.emissiveIntensity = this.power * (0.55 + 0.35 * Math.sin(time * 3 + this.group.position.x));
-        this.glow.intensity = this.power * this.boot * (1.6 + this.hover * 0.8);
+        this.glow.setLevel(this.power * this.boot * (0.8 + this.hover * 0.5));
 
         // stick and buttons follow the keys while playing
         const has = (...codes) => codes.some((c) => this.keys.has(c));

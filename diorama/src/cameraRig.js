@@ -14,8 +14,9 @@ export default class CameraRig {
         this.camera = camera;
         this.dom = dom;
 
-        this.home = { az: 34 * DEG, el: 27 * DEG, dist: 25, target: new THREE.Vector3(-0.4, 0.75, 0.1) };
-        this.limits = { az: [-6 * DEG, 78 * DEG], el: [12 * DEG, 52 * DEG], dist: [13, 32] };
+        this.home = { az: 34 * DEG, el: 27 * DEG, dist: 30, target: new THREE.Vector3(-0.6, 0.6, -0.4) };
+        // all the way round; high enough to look down into the room, never under the street
+        this.limits = { az: [-Infinity, Infinity], el: [9 * DEG, 68 * DEG], dist: [13, 44] };
         this.goal = { az: this.home.az, el: this.home.el, dist: this.home.dist };
         this.cur = { ...this.goal };
         this.target = this.home.target.clone();
@@ -27,7 +28,7 @@ export default class CameraRig {
         this.parallax = new THREE.Vector2();
         this.enabled = true;                  // orbit input accepted
         this.flight = null;
-        this.mode = 'orbit';                  // 'orbit' | 'flight' | 'fixed'
+        this.mode = 'orbit';                  // 'orbit' | 'flight' | 'fixed' | 'external' (someone else drives)
         this.fixedPose = null;
         this.drag = null;
         this.idleTime = 0;
@@ -78,7 +79,7 @@ export default class CameraRig {
             this.drag.moved = Math.max(this.drag.moved, Math.hypot(dx, dy));
             if (this.drag.moved < 4) return;
             const k = 2.4 / window.innerHeight;
-            this.goal.az = this.softLimit(this.drag.az - dx * k, this.limits.az);
+            this.goal.az = this.drag.az - dx * k * 1.3;
             this.goal.el = this.softLimit(this.drag.el + dy * k, this.limits.el);
             this.idleTime = 0;
             this.onInteract?.('drag');
@@ -86,7 +87,6 @@ export default class CameraRig {
         window.addEventListener('pointerup', () => {
             if (!this.drag) return;
             // Rubber band back inside the limits.
-            this.goal.az = clamp(this.goal.az, ...this.limits.az);
             this.goal.el = clamp(this.goal.el, ...this.limits.el);
             this.drag = null;
         });
@@ -156,6 +156,7 @@ export default class CameraRig {
 
     update(dt) {
         const cam = this.camera;
+        if (this.mode === 'external') return;
         // pointer parallax, eased
         this.parallax.x = damp(this.parallax.x, this.pointer.x, 2.5, dt);
         this.parallax.y = damp(this.parallax.y, this.pointer.y, 2.5, dt);

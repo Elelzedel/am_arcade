@@ -109,13 +109,13 @@ export function createStreet(scene) {
 
     // the water main and a fibre duct, cut clean where the world ends
     const pipeMat = mat(P.pipe, { rough: 0.45, metal: 0.6 });
-    const pipe = add(root, new THREE.CylinderGeometry(0.2, 0.2, W - 0.1, 28, 1, true), pipeMat, { p: [cx, -0.82, 2.2], r: [0, 0, Math.PI / 2], cast: false });
+    const pipe = add(root, new THREE.CylinderGeometry(0.2, 0.2, W - 0.1, 28, 1, true), pipeMat, { p: [cx, -0.82, PLINTH.maxZ - 1.1], r: [0, 0, Math.PI / 2], cast: false });
     pipe.material = pipeMat;
     for (const x of [PLINTH.minX + 0.05, PLINTH.maxX - 0.05]) {
-        add(root, new THREE.RingGeometry(0.15, 0.2, 28), mat('#6aa6b8', { rough: 0.3, metal: 0.7, side: THREE.DoubleSide }), { p: [x, -0.82, 2.2], r: [0, Math.PI / 2, 0], cast: false });
-        add(root, new THREE.CircleGeometry(0.15, 28), mat('#0c1420', { rough: 1, side: THREE.DoubleSide }), { p: [x + (x < 0 ? 0.01 : -0.01), -0.82, 2.2], r: [0, Math.PI / 2, 0], cast: false });
+        add(root, new THREE.RingGeometry(0.15, 0.2, 28), mat('#6aa6b8', { rough: 0.3, metal: 0.7, side: THREE.DoubleSide }), { p: [x, -0.82, PLINTH.maxZ - 1.1], r: [0, Math.PI / 2, 0], cast: false });
+        add(root, new THREE.CircleGeometry(0.15, 28), mat('#0c1420', { rough: 1, side: THREE.DoubleSide }), { p: [x + (x < 0 ? 0.01 : -0.01), -0.82, PLINTH.maxZ - 1.1], r: [0, Math.PI / 2, 0], cast: false });
     }
-    const duct = add(root, new THREE.CylinderGeometry(0.07, 0.07, D - 0.1, 16), mat('#ff7a3d', { rough: 0.5 }), { p: [4.4, -0.62, cz], r: [Math.PI / 2, 0, 0], cast: false });
+    const duct = add(root, new THREE.CylinderGeometry(0.07, 0.07, D - 0.1, 16), mat('#ff7a3d', { rough: 0.5 }), { p: [(WALK.maxX + PLINTH.maxX) / 2 + 0.6, -0.62, cz], r: [Math.PI / 2, 0, 0], cast: false });
     duct.name = 'duct';
 
     // --- road markings -------------------------------------------------------
@@ -140,7 +140,7 @@ export function createStreet(scene) {
 
     // manhole (it steams) and a storm drain
     const iron = mat('#2f2b3d', { rough: 0.5, metal: 0.8 });
-    const manhole = new THREE.Vector3(-1.9, 0.017, frontZ + 0.35);
+    const manhole = new THREE.Vector3(-2.6, 0.017, frontZ + 0.35);
     add(root, new THREE.CylinderGeometry(0.34, 0.34, 0.02, 40), iron, { p: [manhole.x, 0.005, manhole.z], cast: false });
     const grid = canvasTexture(256, 256, (ctx, w) => {
         ctx.fillStyle = '#34304a';
@@ -151,8 +151,8 @@ export function createStreet(scene) {
         for (let a = 0; a < 8; a++) { ctx.beginPath(); ctx.moveTo(128, 128); ctx.lineTo(128 + Math.cos(a * Math.PI / 4) * 128, 128 + Math.sin(a * Math.PI / 4) * 128); ctx.stroke(); }
     });
     add(root, new THREE.CircleGeometry(0.31, 40), new THREE.MeshStandardMaterial({ map: grid, roughness: 0.45, metalness: 0.7 }), { p: [manhole.x, manhole.y, manhole.z], r: [-Math.PI / 2, 0, 0], cast: false });
-    add(root, rbox(0.7, 0.03, 0.22, 0.01, 1), iron, { p: [-3.4, 0.01, WALK.maxZ + 0.13], cast: false });
-    for (let i = 0; i < 6; i++) add(root, rbox(0.06, 0.035, 0.16, 0.005, 1), mat('#0e0c18', { rough: 1 }), { p: [-3.65 + i * 0.1, 0.012, WALK.maxZ + 0.13], cast: false });
+    add(root, rbox(0.7, 0.03, 0.22, 0.01, 1), iron, { p: [-4.4, 0.01, WALK.maxZ + 0.13], cast: false });
+    for (let i = 0; i < 6; i++) add(root, rbox(0.06, 0.035, 0.16, 0.005, 1), mat('#0e0c18', { rough: 1 }), { p: [-4.65 + i * 0.1, 0.012, WALK.maxZ + 0.13], cast: false });
 
     // --- pavement ------------------------------------------------------------
     const pw = WALK.maxX - WALK.minX;

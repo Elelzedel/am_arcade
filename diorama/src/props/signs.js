@@ -8,31 +8,27 @@ import { power } from '../power.js';
 
 // ---- the rooftop marquee -------------------------------------------------------
 
-export function createRooftopSign(scene) {
-    const top = ROOM.floor + ROOM.wallH;
-    const cx = (ROOM.minX + ROOM.maxX) / 2 - 0.2;
-    const z = ROOM.minZ - ROOM.wallT / 2;
-    const root = group(scene, { p: [cx, top, z], name: 'rooftop-sign' });
+export function createPylonSign(scene, { position, rotationY = 0 }) {
+    const root = group(scene, { p: position, r: [0, rotationY, 0], name: 'pylon-sign' });
     const W = 3.3;
     const H = 1.3;
-    const lift = 0.34;
+    const lift = 4.1;          // bottom of the sign above the pavement
     const steel = mat('#2c2840', { rough: 0.45, metal: 0.85 });
 
-    // scaffold: two legs, a cross brace and a catwalk
-    for (const x of [-W * 0.34, W * 0.34]) {
-        add(root, rbox(0.07, lift + 0.2, 0.07, 0.01, 1), steel, { p: [x, (lift + 0.2) / 2, -0.02] });
-        add(root, rbox(0.05, 0.9, 0.05, 0.01, 1), steel, { p: [x, 0.45, -0.32], r: [0.62, 0, 0] });
-        add(root, rbox(0.05, 0.05, 0.4, 0.01, 1), steel, { p: [x, 0.03, -0.2] });
-    }
-    add(root, rbox(W * 0.72, 0.05, 0.05, 0.01, 1), steel, { p: [0, lift * 0.5, -0.02], r: [0, 0, 0] });
+    // the pylon: a square column on a plinth, with a service ladder
+    add(root, rbox(0.7, 0.3, 0.7, 0.05, 2), mat('#3a3553', { rough: 0.8 }), { p: [0, 0.15, 0] });
+    add(root, rbox(0.3, lift + 0.1, 0.3, 0.04, 2), steel, { p: [0, (lift + 0.1) / 2 + 0.2, 0] });
+    for (const x of [-0.08, 0.08]) add(root, rbox(0.02, lift - 0.8, 0.02, 0.006, 1), steel, { p: [x, lift / 2 + 0.3, 0.2] });
+    for (let y = 0.8; y < lift - 0.2; y += 0.3) add(root, rbox(0.18, 0.018, 0.018, 0.006, 1), steel, { p: [0, y, 0.2] });
+    add(root, rbox(W * 0.8, 0.12, 0.34, 0.03, 2), steel, { p: [0, lift - 0.06, 0] });
 
     // the cabinet
-    const box = add(root, rbox(W, H, 0.2, 0.05, 3), mat('#1b1230', { rough: 0.55, metal: 0.2 }), { p: [0, lift + H / 2, 0] });
-    box.name = 'sign-box';
-    add(root, rbox(W + 0.06, 0.05, 0.24, 0.02, 2), mat(P.trim, { rough: 0.35, metal: 0.8 }), { p: [0, lift + H + 0.02, 0] });
-    add(root, rbox(W + 0.06, 0.05, 0.24, 0.02, 2), mat(P.trim, { rough: 0.35, metal: 0.8 }), { p: [0, lift - 0.02, 0] });
+    add(root, rbox(W, H, 0.28, 0.05, 3), mat('#1b1230', { rough: 0.55, metal: 0.2 }), { p: [0, lift + H / 2, 0] });
+    add(root, rbox(W + 0.06, 0.05, 0.32, 0.02, 2), mat(P.trim, { rough: 0.35, metal: 0.8 }), { p: [0, lift + H + 0.02, 0] });
+    add(root, rbox(W + 0.06, 0.05, 0.32, 0.02, 2), mat(P.trim, { rough: 0.35, metal: 0.8 }), { p: [0, lift - 0.02, 0] });
 
-    // neon face: AM in pink, ARCADE in cyan, the last E on its own tired tube
+    // neon faces, one on each side: AM in pink, ARCADE in cyan, the last E on
+    // its own tired tube
     const ppm = 420;
     const layout = (ctx, w, h) => {
         // as big as fits, with a margin for the bulbs
@@ -42,47 +38,54 @@ export function createRooftopSign(scene) {
         const am = ctx.measureText('AM ').width;
         const arcad = ctx.measureText('ARCAD').width;
         const e = ctx.measureText('E').width;
-        const total = am + arcad + e;
-        const x0 = (w - total) / 2;
+        const x0 = (w - (am + arcad + e)) / 2;
         return { x0, am, arcad, e, y: h * 0.42, font: `${size}px ${FONTS.neon}` };
     };
     const drawWord = (only) => (ctx, w, h, tube) => {
         const L = layout(ctx, w, h);
-        const font = L.font;
         const width = Math.max(3, h * 0.012);
         if (only === 'main') {
-            tube.text('AM', L.x0, L.y, { font, color: P.pink, width, align: 'left', fill: true });
-            tube.text('ARCAD', L.x0 + L.am, L.y, { font, color: P.cyan, width, align: 'left', fill: true });
+            tube.text('AM', L.x0, L.y, { font: L.font, color: P.pink, width, align: 'left', fill: true });
+            tube.text('ARCAD', L.x0 + L.am, L.y, { font: L.font, color: P.cyan, width, align: 'left', fill: true });
             tube.text("open 'til 4", w / 2, h * 0.8, { font: `${h * 0.2}px ${FONTS.script}`, color: P.amber, width: width * 1.3 });
-            // little tube underline flourishes
             tube.path((c) => { c.moveTo(w * 0.2, h * 0.8); c.lineTo(w * 0.3, h * 0.8); }, { color: P.amber, width: width * 1.2 });
             tube.path((c) => { c.moveTo(w * 0.7, h * 0.8); c.lineTo(w * 0.8, h * 0.8); }, { color: P.amber, width: width * 1.2 });
         } else {
-            tube.text('E', L.x0 + L.am + L.arcad, L.y, { font, color: P.cyan, width, align: 'left', fill: true });
+            tube.text('E', L.x0 + L.am + L.arcad, L.y, { font: L.font, color: P.cyan, width, align: 'left', fill: true });
         }
     };
     const main = neonPanel({ width: W - 0.12, height: H - 0.12, ppm, draw: drawWord('main'), intensity: 1.5 });
     const tired = neonPanel({ width: W - 0.12, height: H - 0.12, ppm, draw: drawWord('e'), intensity: 1.5 });
-    for (const p of [main, tired]) {
-        p.mesh.position.set(0, lift + H / 2, 0.104);
-        root.add(p.mesh);
+    const panels = [];
+    for (const side of [1, -1]) {
+        for (const p of [main, tired]) {
+            const m = side > 0 ? p.mesh : new THREE.Mesh(p.mesh.geometry, p.material);
+            m.renderOrder = 2;
+            m.position.set(0, lift + H / 2, side * (0.144 + (p === tired ? 0.001 : 0)));
+            m.rotation.y = side > 0 ? 0 : Math.PI;
+            root.add(m);
+            panels.push({ mesh: m, panel: p });
+        }
     }
-    tired.mesh.position.z += 0.001;
-    power.add(1.6, (v) => main.setLevel(v), { flicker: 0.8 });
-    power.add(2.0, (v) => tired.setLevel(v), { flicker: 1.2, stutter: 0.04 });
+    const level = (p, v) => {
+        p.setLevel(v);
+        for (const q of panels) if (q.panel === p) q.mesh.visible = v > 0.001;
+    };
+    power.add(1.6, (v) => level(main, v), { flicker: 0.8 });
+    power.add(2.0, (v) => level(tired, v), { flicker: 1.2, stutter: 0.04 });
 
-    // chasing bulbs round the border
-    const bulbs = [];
+    // chasing bulbs round the border, both faces
+    const ring = [];
     const step = 0.13;
     const bw = W - 0.1, bh = H - 0.1;
-    for (let x = -bw / 2; x <= bw / 2 + 1e-6; x += step) { bulbs.push([x, bh / 2]); bulbs.push([x, -bh / 2]); }
-    for (let y = -bh / 2 + step; y < bh / 2 - 1e-6; y += step) { bulbs.push([-bw / 2, y]); bulbs.push([bw / 2, y]); }
-    // order them around the perimeter so the chase travels
-    bulbs.sort((a, b) => Math.atan2(a[1], a[0] * (bh / bw)) - Math.atan2(b[1], b[0] * (bh / bw)));
+    for (let x = -bw / 2; x <= bw / 2 + 1e-6; x += step) { ring.push([x, bh / 2]); ring.push([x, -bh / 2]); }
+    for (let y = -bh / 2 + step; y < bh / 2 - 1e-6; y += step) { ring.push([-bw / 2, y]); ring.push([bw / 2, y]); }
+    ring.sort((a, b) => Math.atan2(a[1], a[0] * (bh / bw)) - Math.atan2(b[1], b[0] * (bh / bw)));
+    const bulbs = [...ring.map(([x, y]) => [x, y, 0.15]), ...ring.map(([x, y]) => [-x, y, -0.15])];
     const bulbMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.022, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }), bulbs.length);
     const m4 = new THREE.Matrix4();
-    bulbs.forEach(([x, y], i) => {
-        m4.makeTranslation(x, lift + H / 2 + y, 0.11);
+    bulbs.forEach(([x, y, z], i) => {
+        m4.makeTranslation(x, lift + H / 2 + y, z);
         bulbMesh.setMatrixAt(i, m4);
         bulbMesh.setColorAt(i, new THREE.Color(0, 0, 0));
     });
@@ -90,21 +93,18 @@ export function createRooftopSign(scene) {
     let bulbLevel = 0;
     power.add(2.6, (v) => { bulbLevel = v; }, { flicker: 0.3 });
 
-    // the sign washes the top of the wall and the scaffold in pink
-    const light = new THREE.PointLight(P.pink, 0, 7, 1.6);
-    light.position.set(0, lift + H / 2, 0.9);
-    root.add(light);
-    power.add(1.6, (v) => { light.intensity = v * 6; }, { flicker: 0.8 });
-
     const warm = new THREE.Color(P.tungsten).multiplyScalar(3.2);
     const dim = new THREE.Color(P.tungsten).multiplyScalar(0.25);
     const c = new THREE.Color();
+    let lastPhase = -1;
     return {
         root,
         update(dt, time, beat = 0) {
             const phase = Math.floor(time * 7);
+            if (phase === lastPhase && beat < 0.05) return;
+            lastPhase = phase;
             for (let i = 0; i < bulbs.length; i++) {
-                const lit = (i + phase) % 3 === 0;
+                const lit = ((i % ring.length) + phase) % 3 === 0;
                 c.copy(lit ? warm : dim).multiplyScalar(bulbLevel * (lit ? 1 + beat * 0.5 : 1));
                 bulbMesh.setColorAt(i, c);
             }
@@ -115,26 +115,28 @@ export function createRooftopSign(scene) {
 
 // ---- inside -----------------------------------------------------------------------
 
-export function createWallSigns(scene) {
-    const root = group(scene, { name: 'wall-signs' });
-    const { minX, minZ, floor } = ROOM;
-
-    // "insert coin", above the three machines on the back wall
+export function createWallSigns(walls, { coinAt, gameOnAt }) {
+    const { floor } = ROOM;
+    // "insert coin", above the machines on the back wall, ending in a coin
+    // slot drawn the way the real ones look: a bezel, a slit, an arrow in
     const coin = neonPanel({
-        width: 1.9, height: 0.62, ppm: 380, intensity: 1.8,
+        width: 2.0, height: 0.62, ppm: 380, intensity: 1.8,
         draw(ctx, w, h, tube) {
-            tube.text('insert coin', w * 0.46, h * 0.5, { font: `${h * 0.56}px ${FONTS.script}`, color: P.pink, width: h * 0.018, fill: true });
-            // a coin, with an arrow into the slot
-            const cx = w * 0.9, cy = h * 0.46, r = h * 0.2;
-            tube.path((c) => c.arc(cx, cy, r, 0, Math.PI * 2), { color: P.amber, width: h * 0.022 });
-            tube.text('¢', cx, cy + 2, { font: `${h * 0.26}px ${FONTS.ui}`, color: P.amber, width: h * 0.014, fill: true });
+            tube.text('insert coin', w * 0.42, h * 0.52, { font: `${h * 0.56}px ${FONTS.script}`, color: P.pink, width: h * 0.018, fill: true });
+            const cx = w * 0.88, cy = h * 0.5, bw = h * 0.3, bh = h * 0.56, r = h * 0.07;
+            tube.path((c) => {
+                c.moveTo(cx - bw / 2 + r, cy - bh / 2);
+                c.arcTo(cx + bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2, r);
+                c.arcTo(cx + bw / 2, cy + bh / 2, cx - bw / 2, cy + bh / 2, r);
+                c.arcTo(cx - bw / 2, cy + bh / 2, cx - bw / 2, cy - bh / 2, r);
+                c.arcTo(cx - bw / 2, cy - bh / 2, cx + bw / 2, cy - bh / 2, r);
+            }, { color: P.amber, width: h * 0.02 });
+            tube.path((c) => { c.moveTo(cx, cy - bh * 0.28); c.lineTo(cx, cy + bh * 0.28); }, { color: P.amber, width: h * 0.028 });
         },
     });
-    coin.mesh.position.set(-2.62, floor + 2.55, minZ + 0.03);
-    root.add(coin.mesh);
     const coinSpill = lightSpill(P.pink, 3.2, 1.6, 0.35);
-    coinSpill.mesh.position.set(-2.62, floor + 2.5, minZ + 0.012);
-    root.add(coinSpill.mesh);
+    walls.back.mount(coin.mesh, coinAt, floor + 2.55, 0.03);
+    walls.back.mount(coinSpill.mesh, coinAt, floor + 2.5, 0.012);
     power.add(0.4, (v) => { coin.setLevel(v); coinSpill.setLevel(v); });
 
     // "GAME ON" arrow over the left-wall machines
@@ -145,16 +147,31 @@ export function createWallSigns(scene) {
             tube.path((c) => { c.moveTo(w * 0.18, h * 0.8); c.lineTo(w * 0.82, h * 0.8); c.moveTo(w * 0.76, h * 0.7); c.lineTo(w * 0.83, h * 0.8); c.lineTo(w * 0.76, h * 0.9); }, { color: P.violet, width: h * 0.02 });
         },
     });
-    gameOn.mesh.position.set(minX + 0.03, floor + 2.5, -1.86);
-    gameOn.mesh.rotation.y = Math.PI / 2;
-    root.add(gameOn.mesh);
     const gameOnSpill = lightSpill(P.mint, 2.6, 1.4, 0.25);
-    gameOnSpill.mesh.position.set(minX + 0.012, floor + 2.45, -1.86);
-    gameOnSpill.mesh.rotation.y = Math.PI / 2;
-    root.add(gameOnSpill.mesh);
+    walls.left.mount(gameOn.mesh, gameOnAt, floor + 2.5, 0.03);
+    walls.left.mount(gameOnSpill.mesh, gameOnAt, floor + 2.45, 0.012);
     power.add(0.9, (v) => { gameOn.setLevel(v); gameOnSpill.setLevel(v); });
+}
 
-    return { root };
+// The five game paintings, framed on the right-hand wall.
+export function createPosters(wall, { urls, from, to, y }) {
+    const n = urls.length;
+    const W = 0.7, H = 1.05;
+    urls.forEach((url, i) => {
+        const frame = new THREE.Group();
+        add(frame, rbox(W + 0.08, H + 0.08, 0.04, 0.012, 2), mat('#15101f', { rough: 0.4, metal: 0.3 }), { p: [0, 0, 0.02] });
+        const material = new THREE.MeshStandardMaterial({ color: '#221b30', roughness: 0.55 });
+        add(frame, new THREE.PlaneGeometry(W, H), material, { p: [0, 0, 0.042], cast: false });
+        new THREE.TextureLoader().load(url, (t) => {
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.anisotropy = 8;
+            material.map = t;
+            material.color.set('#ffffff');
+            material.needsUpdate = true;
+        });
+        const along = n === 1 ? (from + to) / 2 : from + (i / (n - 1)) * (to - from);
+        wall.mount(frame, along, y + (i % 2 ? -0.06 : 0.04), 0.0);
+    });
 }
 
 // A neon-ringed wall clock that keeps real time. It's always AM somewhere.

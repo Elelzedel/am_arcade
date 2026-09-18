@@ -176,10 +176,11 @@ function createCat(parent, position, rotationY) {
     };
 }
 
-export function createCounter(scene) {
-    const { maxX, minZ, floor } = ROOM;
+export function createCounter(scene, { x0, x1 }) {
+    const { minZ, floor } = ROOM;
     const root = group(scene, { name: 'counter' });
-    const x0 = -1.12, x1 = 0.78;
+    // what hangs on the wall behind: the caller folds it with the wall
+    const onWall = group(scene, { name: 'counter-wall' });
     const cx = (x0 + x1) / 2;
     const W = x1 - x0;
     const D = 0.56;
@@ -221,14 +222,10 @@ export function createCounter(scene) {
         const x = x0 + 0.12 + rand() * (W - 0.24);
         const zz = z + (rand() - 0.5) * (D - 0.18);
         const kind = i % 3;
-        if (kind === 0) add(root, new THREE.SphereGeometry(0.035, 14, 10), new THREE.MeshPhysicalMaterial({ color, roughness: 0.2, clearcoat: 1 }), { p: [x, caseY + 0.058, zz] });
+        if (kind === 0) add(root, new THREE.SphereGeometry(0.035, 14, 10), mat(color, { rough: 0.2, clearcoat: 1 }), { p: [x, caseY + 0.058, zz] });
         else if (kind === 1) add(root, new THREE.TorusGeometry(0.03, 0.009, 8, 20), mat(color, { rough: 0.3, metal: 0.4 }), { p: [x, caseY + 0.032, zz], r: [Math.PI / 2, 0, 0] });
         else plush(root, color, [x, caseY + 0.02, zz], 0.55, rand() * 2);
     }
-    const caseLight = new THREE.PointLight('#fff0d8', 0, 1.4, 2);
-    caseLight.position.set(cx, caseY + caseH - 0.05, z);
-    root.add(caseLight);
-    power.add(0.7, (v) => { caseLight.intensity = v * 0.35; });
 
     // till
     const till = group(root, { p: [x1 - 0.32, caseY + caseH + 0.015, z - 0.05], r: [0, -0.35, 0] });
@@ -246,14 +243,14 @@ export function createCounter(scene) {
     // shelf of plush prizes on the wall behind
     const shelfY = floor + 1.72;
     for (const y of [shelfY, shelfY + 0.42]) {
-        add(root, rbox(W - 0.1, 0.03, 0.26, 0.01, 1), wood, { p: [cx, y, minZ + 0.13] });
-        for (const x of [x0 + 0.2, x1 - 0.2]) add(root, rbox(0.03, 0.08, 0.16, 0.01, 1), brass, { p: [x, y - 0.05, minZ + 0.09] });
+        add(onWall, rbox(W - 0.1, 0.03, 0.26, 0.01, 1), wood, { p: [cx, y, minZ + 0.13] });
+        for (const x of [x0 + 0.2, x1 - 0.2]) add(onWall, rbox(0.03, 0.08, 0.16, 0.01, 1), brass, { p: [x, y - 0.05, minZ + 0.09] });
     }
     for (let row = 0; row < 2; row++) {
         const n = 7 - row;
         for (let i = 0; i < n; i++) {
             const x = x0 + 0.22 + (i + row * 0.5) * ((W - 0.44) / 6);
-            plush(root, PLUSH_COLORS[(i + row * 2) % PLUSH_COLORS.length], [x, shelfY + row * 0.42 + 0.015, minZ + 0.14], 0.9 + rand() * 0.3, (rand() - 0.5) * 0.6);
+            plush(onWall, PLUSH_COLORS[(i + row * 2) % PLUSH_COLORS.length], [x, shelfY + row * 0.42 + 0.015, minZ + 0.14], 0.9 + rand() * 0.3, (rand() - 0.5) * 0.6);
         }
     }
 
@@ -264,16 +261,16 @@ export function createCounter(scene) {
             tube.text('prizes', w * 0.5, h * 0.52, { font: `${h * 0.72}px ${FONTS.script}`, color: P.amber, width: h * 0.02, fill: true });
         },
     });
-    sign.mesh.position.set(cx - 0.35, floor + 2.72, minZ + 0.03);
-    root.add(sign.mesh);
+    sign.mesh.position.set(cx - W * 0.2, floor + 2.72, minZ + 0.03);
+    onWall.add(sign.mesh);
     const spill = lightSpill(P.amber, 2.2, 1.2, 0.3);
-    spill.mesh.position.set(cx - 0.35, floor + 2.7, minZ + 0.012);
-    root.add(spill.mesh);
+    spill.mesh.position.set(cx - W * 0.2, floor + 2.7, minZ + 0.012);
+    onWall.add(spill.mesh);
     power.add(1.3, (v) => { sign.setLevel(v); spill.setLevel(v); });
 
     const cat = createCat(root, [x0 + 0.62, caseY + caseH + 0.015, z + 0.02], -0.5);
     return {
-        root, cat,
+        root, cat, onWall,
         update(dt, time) { cat.update(dt, time); },
         counterTop: caseY + caseH,
     };
