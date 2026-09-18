@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SoundBank, ChipTune } from '../../../games/shared/audio.js';
 import { font } from '../../../games/shared/font.js';
 import { getAudioReactive } from '../audioReactive.js';
+import { finish, rounded, block, label, screws, ring, footprint } from './propDetails.js';
 
 /**
  * The Wurli-Tone 3000 against the left wall: the arcade's record player.
@@ -23,7 +24,7 @@ const FRONT = D / 2;
 const DISPLAY_Y = 0.88;
 const DISPLAY_W = 0.62;          // matches the 512x352 display canvas
 const DISPLAY_H = 0.426;
-const RECORD_Y = 1.4;
+const RECORD_Y = 1.365;
 
 const PLAY_FOV = 42;
 const STAND_DISTANCE = 1.45;
@@ -175,6 +176,10 @@ function setNeon(material, hue, intensity) {
     c.setHSL(hue % 1, 0.95, 0.55);
     const luminance = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
     c.multiplyScalar(intensity * Math.min(1, 0.34 / Math.max(luminance, 0.05)));
+    if (material.emissive) {
+        material.emissive.copy(c);
+        c.multiplyScalar(0.65).addScalar(0.075);
+    }
 }
 
 // One continuous path: up the left pilaster, over the arch, down the right one.
@@ -249,9 +254,34 @@ function recordLabelTexture(color) {
     return texture;
 }
 
+// Veneer and woven grille are small, reusable material textures, not decals
+// standing in for the cabinet's shape.
+function cabinetTexture(wood) {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 512;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = wood ? '#634132' : '#60594a'; ctx.fillRect(0,0,256,512);
+    if (wood) {
+        for (let x = 0; x < 256; x += 2) {
+            ctx.strokeStyle = `rgba(28,15,12,${0.12 + (Math.sin(x*13.7)*0.5+0.5)*0.19})`;
+            ctx.lineWidth = 0.6 + (Math.sin(x*0.23)*0.5+0.5)*2.4;
+            ctx.beginPath(); ctx.moveTo(x,0);
+            for(let y=0;y<=512;y+=16) ctx.lineTo(x + Math.sin(y*0.016+x*0.08)*2 + Math.sin(y*0.044)*0.9,y);
+            ctx.stroke();
+        }
+    } else {
+        for(let y=0;y<512;y+=6) { ctx.fillStyle=y%12 ? '#81745b' : '#403e36'; ctx.fillRect(0,y,256,2); }
+        for(let x=0;x<256;x+=5) { ctx.fillStyle='rgba(15,20,21,0.55)'; ctx.fillRect(x,0,2,512); }
+    }
+    const texture = new THREE.CanvasTexture(c); texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = 4;
+    texture.repeat.set(wood ? 1 : 3, wood ? 1 : 1.2);
+    return texture;
+}
+
 // ---- the prop ---------------------------------------------------------------
 export function createJukebox({ position, rotationY }) {
     const group = new THREE.Group();
+    group.name = 'jukebox';
     group.position.copy(position);
     group.rotation.y = rotationY;
 
@@ -261,8 +291,10 @@ export function createJukebox({ position, rotationY }) {
         return obj;
     };
 
-    const chrome = keep(new THREE.MeshStandardMaterial({ color: 0xd8dde6, metalness: 0.95, roughness: 0.18 }));
-    const darkMetal = keep(new THREE.MeshStandardMaterial({ color: 0x1b1a22, metalness: 0.6, roughness: 0.35 }));
+    const chrome = keep(finish('#c6b68d', { metalness: 0.78, roughness: 0.25 }));
+    const darkMetal = keep(finish('#283338', { metalness: 0.55, roughness: 0.4 }));
+    const walnut = keep(cabinetTexture(true));
+    const cloth = keep(cabinetTexture(false));
 
     // ---- cabinet: one extruded arch silhouette -----------------------------
     {
@@ -274,13 +306,10 @@ export function createJukebox({ position, rotationY }) {
         shape.closePath();
         const geo = keep(new THREE.ExtrudeGeometry(shape, {
             depth: D - 0.04, bevelEnabled: true, bevelThickness: 0.02,
-            bevelSize: 0.02, bevelSegments: 2, curveSegments: 28,
+            bevelSize: 0.024, bevelSegments: 4, curveSegments: 48,
         }));
         geo.translate(0, 0, -(D - 0.04) / 2);
-        const body = new THREE.Mesh(geo, keep(new THREE.MeshStandardMaterial({
-            color: 0x35132c, roughness: 0.3, metalness: 0.35,
-            emissive: new THREE.Color(0x150616), emissiveIntensity: 1,
-        })));
+        const body = new THREE.Mesh(geo, keep(finish('#b39b85', { map: walnut, roughness: 0.40, metalness: 0.05 })));
         group.add(body);
     }
 
@@ -296,7 +325,7 @@ export function createJukebox({ position, rotationY }) {
         shape.closePath();
         const face = new THREE.Mesh(
             keep(new THREE.ShapeGeometry(shape, 28)),
-            keep(new THREE.MeshStandardMaterial({ color: 0x0b0814, roughness: 0.55, metalness: 0.2 })),
+            keep(finish('#b5ac8e', { roughness: 0.48, metalness: 0.18 })),
         );
         face.position.z = FRONT + 0.001;
         group.add(face);
@@ -305,7 +334,7 @@ export function createJukebox({ position, rotationY }) {
     // ---- chrome arch trim + colour tubes -----------------------------------
     const tubeMaterials = [];
     {
-        const trimGeo = keep(new THREE.TubeGeometry(archCurve(0.04, 0.06, FRONT + 0.02), 72, 0.026, 8, false));
+        const trimGeo = keep(new THREE.TubeGeometry(archCurve(0.04, 0.06, FRONT + 0.02), 128, 0.025, 12, false));
         group.add(new THREE.Mesh(trimGeo, chrome));
 
         const tubeSpecs = [
@@ -313,8 +342,8 @@ export function createJukebox({ position, rotationY }) {
             { inset: 0.155, radius: 0.014, y0: 0.14 },
         ];
         for (const spec of tubeSpecs) {
-            const geo = keep(new THREE.TubeGeometry(archCurve(spec.inset, spec.y0, FRONT + 0.018), 72, spec.radius, 8, false));
-            const mat = keep(new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
+            const geo = keep(new THREE.TubeGeometry(archCurve(spec.inset, spec.y0, FRONT + 0.018), 128, spec.radius, 12, false));
+            const mat = keep(finish('#f4e7c9', { metalness: 0.08, roughness: 0.26, emissive: '#ffffff', emissiveIntensity: 0.55 }));
             group.add(new THREE.Mesh(geo, mat));
             tubeMaterials.push(mat);
         }
@@ -341,7 +370,7 @@ export function createJukebox({ position, rotationY }) {
 
     {
         const bezel = new THREE.Mesh(
-            keep(new THREE.BoxGeometry(DISPLAY_W + 0.05, DISPLAY_H + 0.05, 0.03)),
+            rounded(DISPLAY_W + 0.055, DISPLAY_H + 0.055, 0.04, 0.018),
             chrome,
         );
         bezel.position.set(0, DISPLAY_Y, FRONT + 0.001);
@@ -357,7 +386,7 @@ export function createJukebox({ position, rotationY }) {
     const cavityMaterial = keep(new THREE.MeshBasicMaterial({
         map: keep(radialGlowTexture()), transparent: true, depthWrite: false, toneMapped: false,
     }));
-    const cavity = new THREE.Mesh(keep(new THREE.CircleGeometry(0.235, 36)), cavityMaterial);
+    const cavity = new THREE.Mesh(keep(new THREE.CircleGeometry(0.215, 48)), cavityMaterial);
     cavity.position.set(0, RECORD_Y, FRONT + 0.004);
     group.add(cavity);
 
@@ -402,7 +431,7 @@ export function createJukebox({ position, rotationY }) {
     // Dome glass over the mechanism.
     {
         const glass = new THREE.Mesh(
-            keep(new THREE.CircleGeometry(0.225, 36)),
+            keep(new THREE.CircleGeometry(0.21, 48)),
             keep(new THREE.MeshStandardMaterial({
                 color: 0xbfe4ff, transparent: true, opacity: 0.055,
                 roughness: 0.3, metalness: 0, depthWrite: false,
@@ -410,7 +439,7 @@ export function createJukebox({ position, rotationY }) {
         );
         glass.position.set(0, RECORD_Y, FRONT + 0.058);
         group.add(glass);
-        const ring = new THREE.Mesh(keep(new THREE.TorusGeometry(0.235, 0.016, 8, 44)), chrome);
+        const ring = new THREE.Mesh(keep(new THREE.TorusGeometry(0.222, 0.012, 12, 64)), chrome);
         ring.position.set(0, RECORD_Y, FRONT + 0.05);
         group.add(ring);
     }
@@ -418,7 +447,7 @@ export function createJukebox({ position, rotationY }) {
     // ---- selection buttons + speaker grille ---------------------------------
     const buttonMaterials = [];
     {
-        const bar = new THREE.Mesh(keep(new THREE.BoxGeometry(0.62, 0.07, 0.04)), chrome);
+        const bar = new THREE.Mesh(rounded(0.64, 0.077, 0.055, 0.016), chrome);
         bar.position.set(0, 0.585, FRONT + 0.012);
         group.add(bar);
         const buttonGeo = keep(new THREE.CylinderGeometry(0.016, 0.016, 0.02, 14));
@@ -435,19 +464,19 @@ export function createJukebox({ position, rotationY }) {
         }
 
         const grille = new THREE.Mesh(
-            keep(new THREE.PlaneGeometry(0.78, 0.38)),
-            keep(new THREE.MeshStandardMaterial({ color: 0x17121e, roughness: 0.95 })),
+            keep(new THREE.PlaneGeometry(0.65, 0.38)),
+            keep(finish('#a79a7e', { map: cloth, roughness: 0.94, metalness: 0 })),
         );
         grille.position.set(0, 0.32, FRONT + 0.006);
         group.add(grille);
-        const slatGeo = keep(new THREE.BoxGeometry(0.76, 0.022, 0.018));
+        const slatGeo = rounded(0.65, 0.014, 0.022, 0.007);
         for (let i = 0; i < 6; i++) {
             const slat = new THREE.Mesh(slatGeo, chrome);
             slat.position.set(0, 0.16 + i * 0.062, FRONT + 0.014);
             group.add(slat);
         }
         // Plinth with an underglow strip, so the machine reads even from the far wall.
-        const plinth = new THREE.Mesh(keep(new THREE.BoxGeometry(W + 0.05, 0.09, D + 0.05)), darkMetal);
+        const plinth = new THREE.Mesh(rounded(W + 0.05, 0.09, D + 0.05, 0.028), darkMetal);
         plinth.position.set(0, 0.045, 0);
         group.add(plinth);
         const strip = new THREE.Mesh(
@@ -459,16 +488,32 @@ export function createJukebox({ position, rotationY }) {
         tubeMaterials.push(strip.material);
     }
 
+    // Brass frame around the speaker cloth, with a small manufacturer's badge.
+    block(group, chrome, 0.68, 0.018, 0.026, 0, 0.52, FRONT + 0.022, 0.008);
+    for (const side of [-1, 1]) {
+        block(group, chrome, 0.018, 0.39, 0.027, side * 0.334, 0.32, FRONT + 0.022, 0.007);
+        // Tube ferrules catch the ceiling light and give the illuminated columns scale.
+        for (let y = 0.19; y < 1.1; y += 0.18) {
+            const ferrule = ring(group, chrome, 0.023, 0.005, side * (W/2 - 0.098), y, FRONT + 0.018);
+            ferrule.rotation.x = Math.PI / 2;
+        }
+        block(group, darkMetal, 0.084, 0.045, D + 0.065, side * 0.395, 0.042, 0, 0.017);
+        block(group, chrome, 0.026, 0.092, 0.022, side * 0.33, 0.88, FRONT + 0.026, 0.008);
+    }
+    block(group, chrome, 0.22, 0.065, 0.018, 0, 0.22, FRONT + 0.04, 0.012);
+    const badge = label(group, 'Wurli-Tone', 0.195, 0.044, 0, 0.22, FRONT + 0.051, { background:'#b8ac88', color:'#293534', family:'Georgia, serif', size:65 });
+    keep(badge.geometry); keep(badge.material); keep(badge.material.map);
+    const fasteners = screws(group, chrome, [[-0.28,0.66,FRONT+0.023],[0.28,0.66,FRONT+0.023],[-0.28,1.10,FRONT+0.023],[0.28,1.10,FRONT+0.023]]);
+    keep(fasteners.geometry);
+
     const glow = new THREE.PointLight(0xff2bd6, 1.0, 3.0, 1.8);
     glow.position.set(0, 1.0, 0.62);
     group.add(glow);
 
     group.updateMatrixWorld(true);
 
-    const colliders = [{
-        minX: position.x - D / 2 - 0.04, maxX: position.x + D / 2 + 0.04,
-        minZ: position.z - W / 2 - 0.04, maxZ: position.z + W / 2 + 0.04,
-    }];
+    // Include the rounded plinth and proud front trim at any orientation.
+    const colliders = [footprint(group, W + 0.06, D + 0.17)];
 
     // ---- audio --------------------------------------------------------------
     const music = new SoundBank();
@@ -699,12 +744,12 @@ export function createJukebox({ position, rotationY }) {
             const tan = Math.tan(THREE.MathUtils.degToRad(PLAY_FOV / 2));
             // Frame the machine, not just the list: you should still see the
             // arch and the colour tubes while you pick a record.
-            const margin = 2.4;
+            const margin = 3.05;
             const distance = Math.max(
                 (DISPLAY_H / 2) * margin / tan,
                 (DISPLAY_W / 2) * margin / (tan * Math.max(aspect, 0.4)),
             );
-            const focus = displayWorld.clone().addScaledVector(up, 0.16);
+            const focus = displayWorld.clone().addScaledVector(up, 0.24);
             const position = focus.clone().addScaledVector(normal, distance);
             const matrix = new THREE.Matrix4().lookAt(position, focus, up);
             return { position, quaternion: new THREE.Quaternion().setFromRotationMatrix(matrix), fov: PLAY_FOV };
@@ -760,8 +805,8 @@ export function createJukebox({ position, rotationY }) {
         // Hue drifts around the current record's colour; silence gets a slow rainbow.
         const spread = playing >= 0 ? 0.09 : 0.5;
         const base = trackHue + Math.sin(time * 0.17) * spread;
-        setNeon(tubeMaterials[0], (base + 1) % 1, 0.95 + pulse * 0.9);
-        setNeon(tubeMaterials[1], (base + 0.42 + 1) % 1, 0.7 + analyser.treble * 0.8);
+        setNeon(tubeMaterials[0], (base + 1) % 1, 0.58 + pulse * 0.38);
+        setNeon(tubeMaterials[1], (base + 0.42 + 1) % 1, 0.42 + analyser.treble * 0.30);
         setNeon(tubeMaterials[2], (base + 1) % 1, 0.55 + pulse * 0.5);
         setNeon(cavityMaterial, (base + 1) % 1, (playing >= 0 ? 0.3 : 0.12) + pulse * 0.35);
 

@@ -487,42 +487,48 @@ export function createOutOfOrderTexture() {
 
 // Backlit front panel of the soda machine.
 export function createSodaFrontTexture() {
-    const c = canvas(256, 552);
+    const c = canvas(512, 1152);
     const ctx = c.getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 256, 0);
-    grad.addColorStop(0, '#b0001c');
-    grad.addColorStop(0.5, '#ff2a44');
-    grad.addColorStop(1, '#b0001c');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 552);
-
-    // A big tilted can.
-    ctx.save();
-    ctx.translate(128, 300);
-    ctx.rotate(-0.25);
-    ctx.fillStyle = '#e8e8ec';
-    ctx.beginPath();
-    ctx.roundRect(-55, -120, 110, 240, 18);
-    ctx.fill();
-    ctx.fillStyle = '#d1001f';
-    ctx.fillRect(-55, -80, 110, 160);
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(-55, 10);
-    ctx.bezierCurveTo(-20, -30, 20, 50, 55, 0);
-    ctx.stroke();
+    const field = ctx.createLinearGradient(0, 0, 512, 1152);
+    field.addColorStop(0, '#921e31'); field.addColorStop(0.44, '#c93143'); field.addColorStop(1, '#761827');
+    ctx.fillStyle = field; ctx.fillRect(0,0,512,1152);
+    // A sweeping cream ribbon and subtle print grain behind the product.
+    ctx.fillStyle = '#e8dfc9';
+    ctx.beginPath(); ctx.moveTo(-50,870); ctx.bezierCurveTo(120,670,350,950,560,640);
+    ctx.lineTo(560,737); ctx.bezierCurveTo(330,1010,100,775,-50,980); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#ebd8b499'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#f2e8d4'; ctx.font='500 25px sans-serif'; ctx.fillText('THE ORIGINAL',256,96);
+    ctx.font='italic bold 130px Georgia, serif'; ctx.fillText('Cola',246,224);
+    ctx.font='20px sans-serif'; ctx.fillText('GOOD TIMES. GREAT TASTE.',256,332);
+    ctx.save(); ctx.translate(268,636); ctx.rotate(-0.19);
+    ctx.shadowColor='#2f0b1f99'; ctx.shadowBlur=26; ctx.shadowOffsetX=18; ctx.shadowOffsetY=20;
+    const metal=ctx.createLinearGradient(-111,0,111,0);
+    metal.addColorStop(0,'#737f81'); metal.addColorStop(0.12,'#c9d0c7'); metal.addColorStop(0.37,'#f0efda');
+    metal.addColorStop(0.6,'#a5b4b3'); metal.addColorStop(0.86,'#e4e3d1'); metal.addColorStop(1,'#58676e');
+    ctx.fillStyle=metal; ctx.beginPath(); ctx.roundRect(-108,-210,216,427,31);ctx.fill();
+    ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+    const wrap=ctx.createLinearGradient(-108,0,108,0);
+    wrap.addColorStop(0,'#6a1a2c');wrap.addColorStop(0.2,'#a31f35');wrap.addColorStop(0.42,'#d04b53');wrap.addColorStop(0.65,'#ad293b');wrap.addColorStop(1,'#581526');
+    ctx.fillStyle=wrap;ctx.fillRect(-108,-165,216,336);
+    ctx.fillStyle='#ece8d5';ctx.font='italic bold 66px Georgia, serif';ctx.fillText('Cola',-3,-58);
+    ctx.font='12px sans-serif';ctx.fillText('ORIGINAL TASTE',0,0);
+    ctx.strokeStyle='#eee6ce';ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(-109,76);ctx.bezierCurveTo(-46,16,27,131,109,64);ctx.stroke();
+    // Rolled rim, pull tab and a readable metallic top instead of white caps.
+    ctx.fillStyle=metal;ctx.beginPath();ctx.ellipse(0,-188,103,22,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#5b696a';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,-188,89,16,0,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#576365';ctx.beginPath();ctx.ellipse(2,-191,19,8,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#d6d9cc';ctx.lineWidth=5;ctx.beginPath();ctx.ellipse(-1,-183,13,7,0,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#dcdaca';ctx.font='11px sans-serif';ctx.fillText('12 FL OZ  •  355 mL',0,145);
+    // Condensation catches only one edge of each bead.
+    for(let i=0;i<85;i++) {
+        const x=Math.sin(i*42.73)*97,y=Math.sin(i*17.19)*159;
+        const r=1.4+(Math.sin(i*3.1)*0.5+0.5)*2.9;
+        ctx.fillStyle='#51182755';ctx.beginPath();ctx.ellipse(x,y,r,r*1.3,0,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='#fae2c199';ctx.lineWidth=0.8;ctx.beginPath();ctx.arc(x,y,r,Math.PI,Math.PI*1.75);ctx.stroke();
+    }
     ctx.restore();
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'italic bold 64px Georgia, serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur = 6;
-    ctx.fillText('Cola', 128, 70);
-    ctx.shadowBlur = 0;
-    ctx.font = font(14);
-    ctx.fillText('ICE COLD', 128, 500);
+    ctx.fillStyle='#f4ead5';ctx.font='bold 37px sans-serif';ctx.fillText('ICE COLD',256,1040);
+    ctx.font='18px sans-serif';ctx.fillText('REFRESH YOUR GAME',256,1090);
     return toTexture(c);
 }

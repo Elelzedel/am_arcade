@@ -1,22 +1,8 @@
 import * as THREE from 'three';
-import { font } from '../../../games/shared/font.js';
+import { createBlockTexture } from './streetArt.js';
 
-/**
- * The world outside the entrance: a rainy neon street at night.
- *
- * The +Z wall is solid behind the doors, so the street is not real geometry —
- * it is one plane sitting on the glass running a parallax shader. Rays are
- * traced (analytically, one intersection each) against a handful of layers: the
- * sky, a skyline, the storefront across the road, and the wet road itself,
- * which mirrors the storefront back at you. It costs one small quad, but
- * because every layer is at a real depth it parallaxes correctly as you walk,
- * which is what sells it.
- */
-
-const STORE_DEPTH = 10.0;   // storefront facade, metres out from the glass
-const SKY_DEPTH = 42.0;     // skyline
-const GROUND_Y = -1.15;     // plane-local y of the pavement (the glass is 2.3 m tall)
-
+// A window onto a single, authored neighbourhood. Analytic depth layers keep
+// the view and road reflections in perspective without an extra render pass.
 const vertexShader = /* glsl */`
     varying vec3 vLocal;
 
@@ -27,296 +13,273 @@ const vertexShader = /* glsl */`
 `;
 
 const fragmentShader = /* glsl */`
-    uniform sampler2D uSigns;
+    uniform sampler2D uBlock;
     uniform vec3 uCamLocal;
     uniform float uTime;
-    uniform vec4 uCar;      // x, z, brightness, heading
+    uniform vec4 uCar;
     uniform float uOpacity;
-
     varying vec3 vLocal;
 
-    const float STORE_DEPTH = ${STORE_DEPTH.toFixed(1)};
-    const float SKY_DEPTH = ${SKY_DEPTH.toFixed(1)};
-    const float GROUND_Y = ${GROUND_Y.toFixed(2)};
-
-    float hash21(vec2 p) {
+    const float GROUND = -1.15;
+    float hash(vec2 p) {
         p = fract(p * vec2(233.34, 851.73));
         p += dot(p, p + 23.45);
         return fract(p.x * p.y);
     }
-
-    // Where a ray started on the glass crosses the plane z = -depth.
-    vec2 layerHit(vec3 o, vec3 d, float depth) {
-        return o.xy + d.xy * ((-depth - o.z) / min(d.z, -0.02));
+    float noise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+                   mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
     }
-
-    // Storefront signage, drawn once into a canvas; x maps to [-16, 16] m.
-    vec4 signs(vec2 p) {
-        vec2 uv = vec2((p.x + 16.0) / 32.0, (p.y - GROUND_Y) / 5.6);
-        if (uv.y < 0.0 || uv.y > 1.0) return vec4(0.0);
-        vec4 s = texture2D(uSigns, fract(vec2(uv.x, clamp(uv.y, 0.0, 1.0))));
-        // Every few metres of shopfront runs off its own tired transformer.
-        float id = floor(p.x / 3.7);
-        float f = hash21(vec2(id, 3.0));
-        float flick = f > 0.72 ? (0.45 + 0.55 * step(0.25, fract(uTime * 1.7 + f * 10.0))) : 1.0;
-        return s * flick;
+    float box(vec2 p, vec2 center, vec2 halfSize) {
+        vec2 aa = max(fwidth(p), vec2(0.002));
+        vec2 edge = 1.0 - smoothstep(halfSize - aa, halfSize + aa, abs(p - center));
+        return edge.x * edge.y;
     }
-
-    // Facade across the road: brick, lit windows, awning, neon.
-    vec3 storefront(vec2 p, out float mask) {
-        float top = 3.15 + 0.45 * sin(p.x * 0.31);
-        mask = step(p.y, top) * step(GROUND_Y, p.y);
-        if (mask < 0.5) return vec3(0.0);
-
-        vec3 col = vec3(0.009, 0.0075, 0.015);
-        // Course lines so the wall has some texture at this distance.
-        col *= 0.75 + 0.5 * step(0.06, fract(p.y * 3.1));
-        col += vec3(0.002) * hash21(floor(p * 4.0));
-
-        // Upper windows, a few of them lit and lived-in.
-        vec2 w = vec2(p.x / 1.5, (p.y - 2.0) / 0.95);
-        vec2 wf = abs(fract(w) - 0.5);
-        float pane = step(wf.x, 0.26) * step(wf.y, 0.30) * step(2.0, p.y) * step(p.y, top - 0.3);
-        float lit = hash21(floor(w));
-        vec3 warm = mix(vec3(0.20, 0.13, 0.06), vec3(0.05, 0.08, 0.14), step(0.6, hash21(floor(w) + 7.0)));
-        col += pane * warm * step(0.62, lit) * (0.7 + 0.3 * sin(uTime * 0.7 + lit * 30.0));
-        col = mix(col, col * 0.25, pane * step(lit, 0.62));
-
-        // Awning and the lit shopfront under it.
-        float under = step(p.y, 1.5);
-        col += under * vec3(0.035, 0.030, 0.045) * (0.6 + 0.4 * sin(p.x * 1.7));
-        float awning = step(1.5, p.y) * step(p.y, 1.78);
-        col = mix(col, vec3(0.035, 0.008, 0.014) * (0.7 + 0.5 * step(0.5, fract(p.x * 1.6))), awning);
-
-        vec4 sg = signs(p);
-        col += sg.rgb * sg.a * 1.05;
+    vec3 hit(vec3 o, vec3 d, float depth) {
+        return o + d * ((-depth - o.z) / min(d.z, -0.001));
+    }
+    vec4 facade(vec2 p) {
+        vec2 uv = vec2((p.x + 24.0) / 48.0, (p.y - GROUND) / 15.0);
+        if (min(uv.x, uv.y) < 0.0 || max(uv.x, uv.y) > 1.0) return vec4(0);
+        return texture2D(uBlock, uv);
+    }
+    // Separate facade planes. The diner is forward of its taller neighbours.
+    // The atlas never wraps, including when looking sideways along the block.
+    vec4 architecture(vec3 o, vec3 d, out float depth) {
+        depth = 80.0;
+        vec4 result = vec4(0);
+        vec3 p = hit(o, d, 16.0);
+        if (p.x >= 6.2 || p.x < -15.0) {
+            vec4 s = facade(p.xy);
+            if (s.a > 0.1) { result = s; depth = 16.0; }
+        }
+        p = hit(o, d, 14.0);
+        if (p.x >= -15.0 && p.x < -5.05) {
+            vec4 s = facade(p.xy);
+            if (s.a > 0.1) { result = s; depth = 14.0; }
+        }
+        p = hit(o, d, 11.5);
+        if (p.x >= -5.18 && p.x <= 3.47) {
+            vec4 s = facade(p.xy);
+            if (s.a > 0.1) { result = s; depth = 11.5; }
+        }
+        // Return walls give the alley volume as the viewer moves laterally.
+        for (int side = 0; side < 2; side++) {
+            float wallX = side == 0 ? 3.4 : 6.2;
+            if (abs(d.x) > 0.001) {
+                float t = (wallX - o.x) / d.x;
+                vec3 q = o + d * t;
+                if (t > 0.0 && -q.z > 11.55 && -q.z < 28.0 && -q.z < depth
+                    && q.y > GROUND && q.y < (side == 0 ? 6.2 : 9.15)) {
+                    float mortar = smoothstep(0.01, 0.03, abs(fract(q.y * 6.0) - 0.5));
+                    result = vec4(vec3(0.019, 0.028, 0.034) * (0.65 + mortar * 0.35), 1);
+                    result.rgb += vec3(0.035, 0.061, 0.065) * exp(-abs(q.z + 24.0) * 0.4);
+                    depth = -q.z;
+                }
+            }
+        }
+        return result;
+    }
+    vec3 city(vec3 o, vec3 d) {
+        vec3 p = hit(o, d, 58.0);
+        float id = floor(p.x / 6.0);
+        float top = 10.0 + hash(vec2(id, 8)) * 17.0;
+        vec3 col = mix(vec3(0.023, 0.037, 0.055), vec3(0.005, 0.011, 0.024), smoothstep(0.0, 34.0, p.y));
+        if (p.y < top) {
+            col = vec3(0.015, 0.025, 0.038);
+            vec2 grid = vec2(p.x / 1.05, p.y / 1.6);
+            float win = box(fract(grid), vec2(0.5), vec2(0.17, 0.26));
+            col += win * step(0.83, hash(floor(grid))) * vec3(0.065, 0.065, 0.051);
+        }
+        // Alley terminus, with a single blue service light.
+        p = hit(o, d, 29.0);
+        if (p.y < 5.5) {
+            col = vec3(0.014, 0.023, 0.031);
+            col += box(p.xy, vec2(4.7, 1.5), vec2(0.5, 1.4)) * vec3(0.005, 0.012, 0.017);
+            col += vec3(0.05, 0.14, 0.18) * exp(-length((p.xy - vec2(4.7, 3.25)) * vec2(0.8, 1.1)) * 1.6);
+            col += box(p.xy, vec2(4.7, 3.25), vec2(0.23, 0.026)) * vec3(0.35, 0.65, 0.7);
+        }
         return col;
     }
-
-    vec3 skyline(vec3 o, vec3 d, out float mask) {
-        vec2 p = layerHit(o, d, SKY_DEPTH);
-        float col = floor(p.x / 7.0);
-        float h = GROUND_Y + 7.0 + 13.0 * hash21(vec2(col, 1.0));
-        mask = step(p.y, h);
-        if (mask < 0.5) return vec3(0.0);
-        vec3 base = vec3(0.016, 0.014, 0.030);
-        vec2 w = vec2(p.x / 1.3, p.y / 1.5);
-        vec2 wf = abs(fract(w) - 0.5);
-        float pane = step(wf.x, 0.22) * step(wf.y, 0.26);
-        float lit = hash21(floor(w) + col * 3.0);
-        base += pane * step(0.70, lit) * vec3(0.09, 0.08, 0.06) * (0.5 + 0.5 * hash21(floor(w) + 11.0));
-        return base;
+    float ripple(vec2 p) {
+        vec2 cell = floor(p * 1.9);
+        float seed = hash(cell);
+        float age = fract(uTime * 0.68 + seed * 17.0);
+        vec2 center = vec2(hash(cell + 7.0), hash(cell + 19.0)) * 0.65 + 0.175;
+        float radius = length(fract(p * 1.9) - center);
+        float ring = 1.0 - smoothstep(0.012, 0.034, abs(radius - age * 0.36));
+        return ring * (1.0 - age) * smoothstep(0.0, 0.12, age) * step(0.46, seed);
     }
-
-    // Reflected signage smeared down the wet road.
-    vec3 wetReflection(vec3 g, vec3 d, float wet) {
-        vec3 up = vec3(d.x, -d.y, d.z);
-        vec2 p = g.xy + up.xy * ((-STORE_DEPTH - g.z) / up.z);
-        float smear = 0.3 + (-g.z) * 0.10;
-        float wob = (hash21(floor(g.xz * vec2(2.5, 1.2))) - 0.5) * smear * 0.8
-            + sin(g.z * 3.0 + uTime * 0.9) * 0.05;
-        vec4 a = signs(vec2(p.x + wob, p.y));
-        vec4 b = signs(vec2(p.x + wob * 1.3, p.y + smear * 0.55));
-        vec4 c = signs(vec2(p.x + wob * 0.7, p.y - smear * 0.7));
-        vec3 sum = a.rgb * a.a * 0.5 + b.rgb * b.a * 0.3 + c.rgb * c.a * 0.3;
-        return sum * wet;
+    // A modest older sedan: sloping glass, low bonnet, trim and recessed wheels.
+    vec4 traffic(vec2 p) {
+        p.x *= uCar.w;
+        float aa = max(fwidth(p.x), 0.006);
+        float top = 0.67 - smoothstep(0.9, 2.04, p.x) * 0.13
+            - (1.0 - smoothstep(-2.05, -1.55, p.x)) * 0.06;
+        float body = box(p, vec2(0, 0.47), vec2(2.04, 0.23))
+            * (1.0 - smoothstep(top - aa, top + aa, p.y));
+        float roof = clamp((p.y - 0.65) / 0.48, 0.0, 1.0);
+        float left = mix(-1.36, -0.78, roof), right = mix(1.04, 0.35, roof);
+        float cabin = smoothstep(left - aa, left + aa, p.x) * (1.0 - smoothstep(right - aa, right + aa, p.x))
+            * smoothstep(0.62, 0.66, p.y) * (1.0 - smoothstep(1.10, 1.14, p.y));
+        float shape = max(body, cabin);
+        vec3 color = mix(vec3(0.008, 0.016, 0.023), vec3(0.035, 0.05, 0.057), smoothstep(0.25, 0.69, p.y));
+        float glass = smoothstep(left + 0.065, left + 0.085, p.x) * (1.0 - smoothstep(right - 0.085, right - 0.065, p.x))
+            * smoothstep(0.70, 0.73, p.y) * (1.0 - smoothstep(1.045, 1.07, p.y));
+        color = mix(color, mix(vec3(0.012, 0.024, 0.031), vec3(0.056, 0.075, 0.074), roof), glass);
+        color = mix(color, vec3(0.009, 0.017, 0.023), box(p, vec2(-0.34, 0.90), vec2(0.028, 0.2)));
+        color += box(p, vec2(0, 0.67), vec2(1.8, 0.009)) * vec3(0.033, 0.047, 0.050);
+        color *= 1.0 - box(p, vec2(-0.34, 0.47), vec2(0.008, 0.18)) * 0.4;
+        color += box(p, vec2(-0.22, 0.60), vec2(0.05, 0.01)) * vec3(0.06, 0.067, 0.064);
+        float radius = min(length(p - vec2(-1.28, 0.245)), length(p - vec2(1.24, 0.245)));
+        color *= smoothstep(0.21, 0.28, radius);
+        float wheel = 1.0 - smoothstep(0.212, 0.23, radius);
+        color = mix(color, vec3(0.005, 0.009, 0.012), wheel);
+        color += (1.0 - smoothstep(0.10, 0.13, radius)) * vec3(0.026, 0.033, 0.036);
+        color += box(p, vec2(1.92, 0.51), vec2(0.077, 0.047)) * vec3(0.9, 0.78, 0.51);
+        color += box(p, vec2(-1.96, 0.54), vec2(0.055, 0.046)) * vec3(0.36, 0.026, 0.013);
+        return vec4(color, max(shape, wheel));
     }
-
-    vec3 road(vec3 g, vec3 d, float dist) {
-        float lateral = g.x;
-        float out_ = -g.z;
-
-        // Kerb at 2.3 m, road out to 8.4 m, far pavement beyond.
-        float pavement = step(out_, 2.3) + step(8.4, out_);
-        vec3 col = mix(vec3(0.013, 0.012, 0.018), vec3(0.018, 0.0175, 0.021), pavement);
-
-        // Paving slabs / tarmac grain.
-        vec2 cell = pavement > 0.5 ? vec2(0.9, 0.9) : vec2(3.0, 2.0);
-        vec2 f = abs(fract(g.xz / cell) - 0.5);
-        float seam = smoothstep(0.46, 0.5, max(f.x, f.y));
-        col *= 1.0 - seam * 0.5 * pavement;
-        col *= 0.85 + 0.3 * hash21(floor(g.xz * 9.0));
-
-        // Kerb edge and the centre line.
-        col = mix(col, vec3(0.05), smoothstep(0.08, 0.0, abs(out_ - 2.3)));
-        float lane = step(abs(out_ - 5.4), 0.08) * step(0.35, fract(lateral * 0.35));
-        col += vec3(0.10, 0.09, 0.05) * lane;
-
-        // Standing water: patchy, and wetter in the middle of the road.
-        float puddle = smoothstep(0.35, 0.8, hash21(floor(g.xz * vec2(0.8, 0.5))) * 0.5
-            + 0.5 * sin(g.x * 0.7 + g.z * 0.5));
-        float wet = mix(0.35, 1.0, puddle) * (1.0 - pavement * 0.45);
-        col += wetReflection(g, d, wet * 0.5);
-
-        // The arcade's own glow spilling out of the doorway onto wet paving.
-        col += vec3(0.42, 0.30, 0.17) * exp(-out_ * 0.85) * exp(-lateral * lateral * 0.25)
-            * (0.35 + 0.65 * wet) * 0.55;
-
-        // Rain hitting the road: a shimmer of splashes.
-        float sparkle = hash21(floor(g.xz * 22.0) + floor(uTime * 14.0));
-        col += vec3(0.12, 0.14, 0.18) * step(0.985, sparkle) * wet;
-
-        // Headlights raking across the tarmac.
-        float cx = g.x - uCar.x;
-        float cz = g.z - uCar.y;
-        col += vec3(0.5, 0.45, 0.36) * uCar.z * wet
-            * exp(-cx * cx * 0.12) * exp(-cz * cz * 0.03);
-
-        return col * (1.0 - smoothstep(6.0, 16.0, dist) * 0.55);
+    vec3 road(vec3 g, vec3 d) {
+        float outZ = -g.z;
+        float nearWalk = 1.0 - smoothstep(1.78, 1.86, outZ);
+        float farWalk = smoothstep(9.0, 9.12, outZ);
+        float pavement = max(nearWalk, farWalk);
+        float grain = noise(g.xz * 140.0);
+        vec3 col = mix(vec3(0.018, 0.025, 0.032), vec3(0.042, 0.049, 0.054), pavement);
+        col *= 0.82 + grain * 0.23;
+        vec2 slab = abs(fract(g.xz / vec2(1.1, 0.72)) - 0.5);
+        col *= 1.0 - smoothstep(0.478, 0.498, max(slab.x, slab.y)) * pavement * 0.38;
+        float kerb = 1.0 - smoothstep(0.025, 0.065, abs(outZ - 9.1));
+        col += kerb * vec3(0.085, 0.095, 0.095);
+        float line = box(vec2(fract(g.x / 4.6), outZ), vec2(0.5, 5.25), vec2(0.29, 0.035));
+        col += line * vec3(0.11, 0.10, 0.066) * (0.6 + noise(g.xz * 8.0) * 0.4);
+        // Organic patches of water. Distortion varies continuously, not per tile.
+        float puddle = smoothstep(0.33, 0.7, noise(g.xz * vec2(0.6, 1.05)));
+        float wet = mix(0.16, 0.68, puddle) * (1.0 - pavement * 0.32);
+        float rings = ripple(g.xz);
+        vec3 reflected = vec3(d.x, -d.y, d.z);
+        reflected.x += (noise(g.xz * vec2(5.0, 29.0) + vec2(0, uTime * 0.14)) - 0.5) * 0.024;
+        reflected.y += (noise(g.xz * vec2(8.0, 38.0)) - 0.5) * 0.015 + rings * 0.004;
+        float depth;
+        vec3 reflection = architecture(g, reflected, depth).rgb;
+        // A second, rougher lobe smears the bright windows into the wet asphalt.
+        reflected.x += sin(g.z * 48.0 + g.x * 4.0) * 0.018;
+        reflected.y += 0.045;
+        reflection = reflection * 0.67 + architecture(g, reflected, depth).rgb * 0.33;
+        if (uCar.z > 0.0 && g.z > uCar.y) {
+            vec2 p = hit(g, reflected, -uCar.y).xy - vec2(uCar.x, GROUND);
+            vec4 car = traffic(p);
+            reflection = mix(reflection, car.rgb, car.a * 0.8);
+        }
+        col += reflection * wet;
+        float underCar = exp(-pow(abs(g.x - uCar.x) * 0.52, 6.0)) * exp(-pow(abs(g.z - uCar.y) * 2.8, 2.0));
+        col *= 1.0 - underCar * uCar.z * 0.65;
+        col += rings * (reflection + vec3(0.012, 0.022, 0.030)) * 0.16 * puddle;
+        // Pools below the streetlamp and the arcade threshold.
+        col += vec3(0.29, 0.19, 0.084) * exp(-pow(abs(g.x + 4.65) * 0.6, 2.0))
+            * exp(-abs(outZ - 8.6) * 0.38) * (0.3 + puddle * 0.7);
+        col += vec3(0.15, 0.075, 0.12) * exp(-outZ * 1.0 - g.x * g.x * 0.35);
+        float trail = exp(-pow(abs(g.x - uCar.x - uCar.w * 1.6) * 1.3, 2.0));
+        col += vec3(0.27, 0.23, 0.15) * trail * exp(-abs(g.z - uCar.y) * 0.65) * uCar.z * wet;
+        return col;
     }
-
-    // Two slanted layers of falling rain at different depths.
-    float rainLayer(vec2 p, vec2 scale, float speed, float thresh) {
-        p.x += p.y * 0.12;
-        vec2 q = vec2(p.x * scale.x, p.y * scale.y - uTime * speed);
-        vec2 id = floor(q);
-        float h = hash21(id);
-        if (h < thresh) return 0.0;
+    // Rain moves DOWN in world space. Each column has a stable seed and speed,
+    // a sub-centimetre core, soft ends and a different phase at every depth.
+    float rain(vec3 p, float layer) {
+        float column = floor((p.x + p.y * 0.055) * 29.0);
+        float seed = hash(vec2(column, layer));
+        float speed = mix(4.2, 7.8, seed);
+        vec2 q = vec2((p.x + p.y * 0.055) * 29.0,
+            (p.y + uTime * speed) * 1.8 + seed * 31.0);
+        vec2 cell = floor(q);
+        float chance = hash(cell + layer * 19.0);
         vec2 f = fract(q);
-        float streak = smoothstep(0.0, 0.18, f.y) * (1.0 - smoothstep(0.2, 0.65, f.y));
-        float line = smoothstep(0.42, 0.06, abs(f.x - 0.5 + (h - 0.5) * 0.6));
-        return streak * line;
+        float center = 0.18 + seed * 0.64;
+        float aa = max(fwidth(q.x), 0.012);
+        float line = 1.0 - smoothstep(0.018, 0.018 + aa, abs(f.x - center));
+        float tail = smoothstep(0.13, 0.21, f.y) * (1.0 - smoothstep(0.23, 0.46, f.y));
+        return line * tail * step(0.82, chance) * (0.35 + seed * 0.65);
     }
-
     void main() {
         vec3 o = vLocal;
         vec3 d = normalize(vLocal - uCamLocal);
-
-        // Raindrops on the glass bend the ray before anything else is traced.
-        vec2 q = o.xy / 0.105;
-        vec2 id = floor(q);
-        vec2 cf = fract(q) - 0.5;
-        float dh = hash21(id);
-        cf += (vec2(hash21(id + 17.0), hash21(id + 43.0)) - 0.5) * 0.5;
-        cf.y += step(0.86, hash21(id + 31.0)) * (fract(dh * 5.0 + uTime * 0.22) - 0.5);
-        float drop = smoothstep(0.10 + 0.16 * dh, 0.02, length(cf * vec2(1.0, 1.25))) * step(0.42, hash21(id + 5.0));
-        d.xy -= normalize(cf + 1e-4) * drop * 0.055;
+        // Mostly sheltered glass: occasional beads at the edges, tiny refraction.
+        vec2 grid = o.xy * vec2(19.0, 15.0);
+        vec2 id = floor(grid);
+        vec2 f = fract(grid) - vec2(0.2 + hash(id) * 0.6, 0.2 + hash(id + 4.0) * 0.6);
+        float exposed = smoothstep(0.35, 1.18, abs(o.x));
+        float drop = (1.0 - smoothstep(0.08, 0.19, length(f * vec2(1.0, 1.4))))
+            * step(0.94 - exposed * 0.1, hash(id + 8.0));
+        d.xy += f * drop * 0.018;
         d = normalize(d);
-
-        // --- sky -> skyline -> storefront -> road ---------------------------
-        float above = clamp((layerHit(o, d, SKY_DEPTH).y - GROUND_Y) / 22.0, 0.0, 1.0);
-        vec3 col = mix(vec3(0.022, 0.018, 0.040), vec3(0.006, 0.005, 0.016), above);
-
-        float mask;
-        vec3 city = skyline(o, d, mask);
-        col = mix(col, city, mask);
-
-        vec3 sf = storefront(layerHit(o, d, STORE_DEPTH), mask);
-        col = mix(col, sf, mask);
-
-        float groundDist = 0.0;
-        if (d.y < -0.0005) {
-            vec3 g = o + d * ((GROUND_Y - o.y) / d.y);
-            if (-g.z < STORE_DEPTH) {
-                groundDist = length(g - o);
-                col = road(g, d, groundDist);
+        vec3 col = city(o, d);
+        float depth;
+        vec4 buildings = architecture(o, d, depth);
+        col = mix(col, buildings.rgb, buildings.a);
+        if (d.y < -0.0001) {
+            vec3 g = o + d * ((GROUND - o.y) / d.y);
+            if (-g.z > 0.0 && -g.z < depth) {
+                depth = -g.z;
+                col = road(g, d);
             }
         }
-
-        // Headlight glow in the air: closest approach of the view ray to the lamp.
-        vec3 toCar = vec3(uCar.x, GROUND_Y + 0.55, uCar.y) - o;
-        float t = dot(toCar, d);
-        if (t > 0.0) {
-            float r2 = dot(toCar - d * t, toCar - d * t);
-            col += vec3(0.9, 0.82, 0.68) * uCar.z * (exp(-r2 * 0.9) * 0.8 + exp(-r2 * 0.05) * 0.10);
+        // A streetlamp, drain and curbside bollards in front of the shops.
+        vec3 prop = hit(o, d, 8.8);
+        if (depth > 8.8 && prop.y > GROUND) {
+            float post = box(prop.xy, vec2(-4.65, 0.9), vec2(0.038, 2.05));
+            post = max(post, box(prop.xy, vec2(-4.32, 2.93), vec2(0.36, 0.035)));
+            post = max(post, box(prop.xy, vec2(-4.65, GROUND + 0.17), vec2(0.095, 0.17)));
+            for (int i = 0; i < 3; i++) {
+                float bx = 3.7 + float(i) * 0.98;
+                post = max(post, box(prop.xy, vec2(bx, GROUND + 0.31), vec2(0.045, 0.31)));
+            }
+            col = mix(col, vec3(0.029, 0.035, 0.035), post);
+            float lamp = box(prop.xy, vec2(-3.99, 2.88), vec2(0.20, 0.042));
+            col += lamp * vec3(1.5, 1.04, 0.52);
+            if (max(post, lamp) > 0.5) depth = 8.8;
+            col += vec3(0.16, 0.11, 0.052) * exp(-length(prop.xy - vec2(-3.99, 2.88)) * 3.0);
+        }
+        // Infrequent traffic has a body, windows and wheels, not a floating glow.
+        if (uCar.z > 0.0 && depth > -uCar.y) {
+            vec2 p = hit(o, d, -uCar.y).xy - vec2(uCar.x, GROUND);
+            vec4 car = traffic(p);
+            col = mix(col, car.rgb, car.a);
+            if (car.a > 0.5) depth = -uCar.y;
         }
 
-        // Rain in the air, thinning out into the distance.
-        float rain = rainLayer(layerHit(o, d, 2.0), vec2(14.0, 2.2), 7.0, 0.62) * 0.8
-            + rainLayer(layerHit(o, d, 7.0), vec2(26.0, 4.0), 11.0, 0.70) * 0.5;
-        col += vec3(0.30, 0.34, 0.44) * rain * 0.14;
-
-        // Night haze so nothing distant reads as crisp.
-        col = mix(col, vec3(0.022, 0.019, 0.038), clamp(above * 0.5, 0.0, 0.45));
-
-        // --- the glass itself ------------------------------------------------
-        col += vec3(0.45, 0.52, 0.70) * pow(drop, 2.5) * 0.055;                  // droplet highlights
-        col += vec3(0.22, 0.05, 0.28) * smoothstep(-0.2, -1.15, vLocal.y) * 0.16; // arcade floor reflected
-        col += vec3(0.30, 0.10, 0.34) * exp(-pow((vLocal.y - 0.86) * 7.0, 2.0)) * 0.05;
-        col *= 0.94 + 0.06 * hash21(floor(vLocal.xy * 30.0));                    // grime
-
-        float mullion = smoothstep(0.045, 0.02, abs(vLocal.x));                   // gap between the doors
-        float edge = smoothstep(1.17, 1.21, abs(vLocal.x)) + smoothstep(1.06, 1.13, abs(vLocal.y));
-        col = mix(col, vec3(0.010, 0.010, 0.013), clamp(mullion + edge, 0.0, 1.0));
-
+        for (int i = 0; i < 3; i++) {
+            float z = 2.6 + float(i) * 3.1;
+            if (depth > z) {
+                vec3 p = hit(o, d, z);
+                float lamplight = exp(-length((p.xy - vec2(-4.0, 1.6)) * vec2(0.42, 0.3)));
+                float illumination = 0.014 + lamplight * 0.055;
+                col += vec3(0.68, 0.78, 0.86) * rain(p, float(i)) * illumination;
+            }
+        }
+        col = mix(col, vec3(0.018, 0.029, 0.041), smoothstep(12.0, 70.0, depth) * 0.35);
+        col += drop * vec3(0.012, 0.018, 0.025);
+        col += vec3(0.031, 0.01, 0.027) * (1.0 - smoothstep(-1.15, -0.65, o.y));
+        float mullion = 1.0 - smoothstep(0.020, 0.036, abs(o.x));
+        float edge = smoothstep(1.17, 1.21, abs(o.x)) + smoothstep(1.06, 1.13, abs(o.y));
+        col = mix(col, vec3(0.010, 0.012, 0.015), clamp(mullion + edge, 0.0, 1.0));
         gl_FragColor = vec4(col * uOpacity, 1.0);
     }
 `;
 
-// Neon shopfront signage, painted once into a canvas.
-function createSignTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2048;
-    canvas.height = 360;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Canvas x spans 32 m of street, y spans 5.6 m (top of frame = y 4.45 m).
-    const mx = (metres) => ((metres + 16) / 32) * canvas.width;
-    const my = (metres) => (1 - (metres - GROUND_Y) / 5.6) * canvas.height;
-
-    const word = (text, x, y, size, color, glow = 26) => {
-        ctx.font = font(size);
-        ctx.shadowColor = color;
-        ctx.shadowBlur = glow;
-        ctx.fillStyle = color;
-        for (let i = 0; i < 3; i++) ctx.fillText(text, mx(x), my(y));
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = 0.3;
-        ctx.fillText(text, mx(x), my(y));
-        ctx.globalAlpha = 1;
-    };
-
-    const bar = (x, y, w, h, color) => {
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 20;
-        ctx.fillStyle = color;
-        const px = mx(x - w / 2);
-        const py = my(y + h / 2);
-        ctx.fillRect(px, py, (w / 32) * canvas.width, (h / 5.6) * canvas.height);
-        ctx.shadowBlur = 0;
-    };
-
-    word('PHO', -9.6, 2.7, 28, '#39ff14');
-    word('NOODLE  BAR', -9.6, 1.35, 12, '#ffb000', 14);
-
-    word('RAMEN', -5.4, 2.95, 30, '#ff2f6d');
-    bar(-5.4, 2.4, 2.6, 0.06, '#ff2f6d');
-    word('OPEN', -5.4, 1.35, 16, '#39ff14', 18);
-
-    word('HOTEL', -1.4, 3.55, 24, '#00e5ff');
-    word('MOON', -1.4, 3.0, 24, '#00e5ff');
-    word('VACANCY', -1.4, 1.35, 12, '#ff2bd6', 14);
-
-    word('BAR', 2.7, 2.8, 34, '#ffb000');
-    word('LIVE  MUSIC', 2.7, 1.35, 12, '#ff2bd6', 14);
-
-    word('24H', 6.8, 3.1, 28, '#8a5cff');
-    bar(6.8, 2.5, 3.0, 0.05, '#8a5cff');
-    word('LAUNDRY', 6.8, 1.35, 14, '#00e5ff', 16);
-
-    word('KARAOKE', 11.0, 2.8, 20, '#ff2f6d');
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.anisotropy = 4;
-    return texture;
-}
-
-const CAR_CYCLE = 9.5;
-const CAR_TRAVEL = 3.4;
+const CAR_CYCLE = 23.0;
+const CAR_TRAVEL = 7.5;
 
 export function createStreet({ room }) {
     const group = new THREE.Group();
+    group.name = 'rainy-street';
     const doorZ = room.maxZ - 0.035;
 
     const material = new THREE.ShaderMaterial({
         uniforms: {
-            uSigns: { value: createSignTexture() },
+            uBlock: { value: createBlockTexture() },
             uCamLocal: { value: new THREE.Vector3(0, 0, 3) },
             uTime: { value: 0 },
             uCar: { value: new THREE.Vector4(0, -5.4, 0, 1) },
@@ -330,6 +293,7 @@ export function createStreet({ room }) {
     });
 
     const view = new THREE.Mesh(new THREE.PlaneGeometry(2.44, 2.3), material);
+    view.name = 'street-window';
     view.position.set(0, 1.15, doorZ);
     view.rotation.y = Math.PI;
     group.add(view);
@@ -358,7 +322,7 @@ export function createStreet({ room }) {
                 // the door frame, fading into the room.
                 float across = 1.0 - smoothstep(0.35, 1.0, abs(vUv.x));
                 float into = 1.0 - smoothstep(0.0, 1.0, abs(vUv.y * 0.5 + 0.5));
-                float mullion = 1.0 - 0.55 * exp(-pow(vUv.x * 14.0, 2.0));
+                float mullion = 1.0 - 0.55 * exp(-pow(abs(vUv.x) * 14.0, 2.0));
                 float rain = 0.9 + 0.1 * sin(vUv.y * 22.0 - uTime * 6.0);
                 vec3 cool = vec3(0.16, 0.26, 0.42);
                 vec3 warm = vec3(0.42, 0.34, 0.22);
@@ -425,12 +389,13 @@ export function createStreet({ room }) {
         }
 
         // A car every few seconds, alternating direction and lane.
-        const phase = (time % CAR_CYCLE) / CAR_TRAVEL;
-        const trip = Math.floor(time / CAR_CYCLE);
+        const phase = ((time + 13.0) % CAR_CYCLE) / CAR_TRAVEL;
+        const trip = Math.floor((time + 13.0) / CAR_CYCLE);
         const car = material.uniforms.uCar.value;
         if (phase < 1) {
             const heading = trip % 2 === 0 ? 1 : -1;
-            car.x = heading * THREE.MathUtils.lerp(-24, 24, phase);
+            car.x = heading * THREE.MathUtils.lerp(-26, 26, phase);
+            car.w = heading;
             car.y = heading > 0 ? -4.6 : -6.6;
             car.z = Math.sin(phase * Math.PI) * 0.9;
         } else {

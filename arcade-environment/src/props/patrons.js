@@ -1,224 +1,332 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-// Stylised arcade regulars. They're seen mostly as backlit silhouettes, so
-// they're built from simple capsules with a fresnel rim so the neon catches
-// their edges — detail would only make them look worse in this light.
-
-const rimVertex = /* glsl */`
-    varying vec3 vNormalView;
-    varying vec3 vViewDir;
-    void main() {
-        vec4 viewPos = modelViewMatrix * vec4(position, 1.0);
-        vNormalView = normalize(normalMatrix * normal);
-        vViewDir = normalize(-viewPos.xyz);
-        gl_Position = projectionMatrix * viewPos;
-    }
-`;
-
-const rimFragment = /* glsl */`
-    uniform vec3 baseColor;
-    uniform vec3 rimColor;
-    uniform float rimPower;
-    varying vec3 vNormalView;
-    varying vec3 vViewDir;
-    void main() {
-        float rim = 1.0 - max(dot(normalize(vNormalView), normalize(vViewDir)), 0.0);
-        rim = pow(clamp(rim, 0.0, 1.0), rimPower);
-        // Keep the rim a thin edge highlight: too much and they read as mannequins.
-        gl_FragColor = vec4(baseColor + rimColor * rim * 0.55, 1.0);
-        #include <colorspace_fragment>
-    }
-`;
-
-function rimMaterial(baseColor, rimColor, rimPower = 4.0) {
-    return new THREE.ShaderMaterial({
-        uniforms: {
-            baseColor: { value: new THREE.Color(baseColor) },
-            rimColor: { value: new THREE.Color(rimColor) },
-            rimPower: { value: rimPower },
-        },
-        vertexShader: rimVertex,
-        fragmentShader: rimFragment,
+// Two low-poly regulars, dressed for the same late-night arcade as the player.
+// Cloth, skin and rubber use the room's actual lighting; no emissive outline.
+const shared = new Map();
+const UP = new THREE.Vector3(0, 1, 0);
+function geometry(key, make) {
+    if (!shared.has(key)) shared.set(key, make());
+    return shared.get(key);
+}
+function material(color, roughness = 0.95) {
+    return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
+}
+function mesh(parent, shape, mat, position = [0, 0, 0], scale = [1, 1, 1]) {
+    const part = new THREE.Mesh(shape, mat);
+    part.position.set(...position);
+    part.scale.set(...scale);
+    parent.add(part);
+    return part;
+}
+const rounded = () => geometry('rounded', () => new RoundedBoxGeometry(1, 1, 1, 2, 0.16));
+const sphere = () => geometry('sphere', () => new THREE.SphereGeometry(1, 12, 8));
+function box(parent, mat, position, scale) { return mesh(parent, rounded(), mat, position, scale); }
+function oval(parent, mat, position, scale) { return mesh(parent, sphere(), mat, position, scale); }
+function joint(parent, position) {
+    const group = new THREE.Group();
+    group.position.set(...position);
+    parent.add(group);
+    return group;
+}
+// Elliptical cross-sections give clothing an actual cut: hem, waist, chest,
+// shoulder and collar, with broad planes instead of stacked pill shapes.
+function tailored(key, rings) {
+    return geometry(key, () => {
+        const vertices = [], indices = [];
+        const segments = 12;
+        rings.forEach(([y, w, d, z = 0]) => {
+            for (let i = 0; i < segments; i++) {
+                const angle = i / segments * Math.PI * 2;
+                vertices.push(Math.cos(angle) * w, y, Math.sin(angle) * d + z);
+            }
+        });
+        for (let r = 0; r < rings.length - 1; r++) {
+            for (let i = 0; i < segments; i++) {
+                const a = r * segments + i, b = r * segments + (i + 1) % segments;
+                indices.push(a, a + segments, b, b, a + segments, b + segments);
+            }
+        }
+        for (let i = 1; i < segments - 1; i++) {
+            indices.push(0, i, i + 1);
+            const top = (rings.length - 1) * segments;
+            indices.push(top, top + i + 1, top + i);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+        return geo;
     });
 }
-
-const shared = {};
-function geometry(key, create) {
-    if (!shared[key]) shared[key] = create();
-    return shared[key];
+function rod(parent, a, b, radius, mat) {
+    const from = new THREE.Vector3(...a), to = new THREE.Vector3(...b);
+    const part = mesh(parent, geometry('rod', () => new THREE.CylinderGeometry(1, 1, 1, 8)), mat);
+    part.position.copy(from).add(to).multiplyScalar(0.5);
+    part.quaternion.setFromUnitVectors(UP, to.clone().sub(from).normalize());
+    part.scale.set(radius, from.distanceTo(to), radius);
+    return part;
 }
 
-// Builds a figure whose parts are exposed so poses can be animated.
-function buildFigure({ skin = '#141018', rim = '#ff2bd6', height = 1.0 }) {
+function buildFigure({ seated = false } = {}) {
     const root = new THREE.Group();
-    const material = rimMaterial(skin, rim);
-
-    const hips = new THREE.Group();
-    hips.position.y = 0.92 * height;
-    root.add(hips);
-
-    const torso = new THREE.Mesh(
-        geometry('torso', () => new THREE.CapsuleGeometry(0.17, 0.42, 6, 12)),
-        material,
-    );
-    torso.position.y = 0.26 * height;
-    torso.scale.set(1, height, 1);
-    hips.add(torso);
-
-    const head = new THREE.Group();
-    head.position.y = 0.58 * height;
-    hips.add(head);
-    const skull = new THREE.Mesh(geometry('head', () => new THREE.SphereGeometry(0.115, 16, 12)), material);
-    skull.scale.set(1, 1.08, 0.95);
-    head.add(skull);
-    const hair = new THREE.Mesh(geometry('hair', () => new THREE.SphereGeometry(0.122, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.62)), material);
-    hair.position.y = 0.012;
-    head.add(hair);
-
+    const cloth = material(seated ? '#6f526c' : '#426a66');
+    const trim = material(seated ? '#46344e' : '#253d3d');
+    const sleeve = seated ? cloth : material('#b4ad93');
+    const denim = material(seated ? '#303b55' : '#35414b');
+    const seams = material(seated ? '#555974' : '#59616a');
+    const skin = material(seated ? '#b57f61' : '#936549', 0.86);
+    const hair = material(seated ? '#49302c' : '#292327');
+    const rubber = material('#292c35');
+    const sole = material('#b6b4ac');
+    const accent = material(seated ? '#b7986e' : '#c8b481');
+    const faceInk = material('#392b2c');
+    const hips = joint(root, [0, seated ? 0.58 : 0.90, 0]);
+    const body = joint(hips, [0, 0, 0]);
+    hips.name = 'hips';
+    body.name = 'jacket';
+    mesh(body, tailored('jacket', [
+        [-0.035, 0.165, 0.107], [0.065, 0.18, 0.115], [0.29, 0.215, 0.126],
+        [0.43, 0.225, 0.11], [0.50, 0.14, 0.092], [0.53, 0.075, 0.07],
+    ]), cloth);
+    mesh(body, tailored('hem', [[-0.05, 0.165, 0.105], [0.018, 0.17, 0.11]]), trim);
+    oval(body, skin, [0, 0.54, 0], [0.061, 0.091, 0.064]);
+    if (!seated) {
+        // Bomber zip, slant pockets, a small embroidered back patch.
+        box(body, trim, [0, 0.26, 0.124], [0.022, 0.45, 0.012]);
+        box(body, accent, [0, 0.40, 0.135], [0.018, 0.038, 0.012]);
+        for (const side of [-1, 1]) {
+            const pocket = box(body, trim, [side * 0.12, 0.09, 0.107], [0.085, 0.015, 0.014]);
+            pocket.rotation.z = side * 0.35;
+        }
+        box(body, accent, [-0.10, 0.365, 0.121], [0.052, 0.049, 0.015]);
+        box(body, trim, [0, 0.30, -0.126], [0.22, 0.13, 0.012]);
+        // Three stitched chevrons, subdued enough to belong to the jacket.
+        for (let i = 0; i < 3; i++) {
+            const z = -0.135;
+            rod(body, [-0.07, 0.325 - i * 0.028, z], [0, 0.30 - i * 0.028, z], 0.007, accent);
+            rod(body, [0, 0.30 - i * 0.028, z], [0.07, 0.325 - i * 0.028, z], 0.007, accent);
+        }
+    } else {
+        // A dropped hood, kangaroo pocket and two drawstrings.
+        oval(body, trim, [0, 0.43, -0.094], [0.146, 0.113, 0.089]);
+        oval(body, cloth, [0, 0.425, -0.132], [0.125, 0.09, 0.066]);
+        box(body, trim, [0, 0.105, 0.122], [0.23, 0.13, 0.028]);
+        for (const side of [-1, 1]) rod(body, [side * 0.058, 0.46, 0.09], [side * 0.071, 0.29, 0.137], 0.006, sole);
+    }
+    const head = joint(body, [0, 0.665, 0.005]);
+    head.name = 'head';
+    const skull = mesh(head, tailored('face', [
+        [-0.12, 0.057, 0.060, 0.024], [-0.075, 0.083, 0.078, 0.018],
+        [0.01, 0.098, 0.087], [0.092, 0.088, 0.081, -0.003], [0.13, 0.057, 0.051],
+    ]), skin);
+    skull.name = 'face';
+    for (const side of [-1, 1]) {
+        oval(head, skin, [side * 0.096, -0.005, 0], [0.02, 0.033, 0.024]);
+        // Small inset eyes and brows, with no bright cartoon whites.
+        box(head, faceInk, [side * 0.040, 0.007, 0.080], [0.024, 0.006, 0.008]);
+        box(head, hair, [side * 0.039, 0.035, 0.079], [0.034, 0.009, 0.011]);
+    }
+    oval(head, skin, [0, -0.023, 0.087], [0.022, 0.032, 0.032]);
+    box(head, faceInk, [0, -0.078, 0.082], [0.034, 0.004, 0.004]);
+    oval(head, hair, [0, 0.074, -0.018], [0.105, 0.086, 0.089]);
+    if (!seated) {
+        oval(head, trim, [0, 0.105, -0.003], [0.111, 0.065, 0.105]);
+        box(head, trim, [0, 0.080, 0.091], [0.21, 0.020, 0.145]);
+        box(head, accent, [0, 0.126, 0.087], [0.031, 0.031, 0.011]);
+        for (const side of [-1, 1]) box(head, hair, [side * 0.088, -0.003, -0.019], [0.021, 0.053, 0.062]);
+    } else {
+        oval(head, hair, [0, 0.0, -0.077], [0.098, 0.12, 0.051]);
+        oval(head, hair, [0, -0.035, -0.124], [0.065, 0.063, 0.061]);
+        const fringe = oval(head, hair, [-0.043, 0.071, 0.063], [0.064, 0.04, 0.034]);
+        fringe.rotation.z = -0.35;
+        // Headphones give the waiting regular an activity without a glowing phone.
+        const band = mesh(head, geometry('headphone-band', () => new THREE.TorusGeometry(0.124, 0.012, 6, 20, Math.PI)), rubber, [0, 0.012, 0]);
+        band.name = 'headphones';
+        for (const side of [-1, 1]) {
+            box(head, rubber, [side * 0.113, -0.005, 0], [0.045, 0.084, 0.075]);
+            box(head, accent, [side * 0.14, -0.005, 0], [0.011, 0.061, 0.046]);
+        }
+    }
     const arms = [-1, 1].map((side) => {
-        const shoulder = new THREE.Group();
-        shoulder.position.set(side * 0.19, 0.45 * height, 0);
-        hips.add(shoulder);
-        const upper = new THREE.Mesh(geometry('arm', () => new THREE.CapsuleGeometry(0.052, 0.2, 4, 8)), material);
-        upper.position.y = -0.12;
-        shoulder.add(upper);
-        const forearm = new THREE.Group();
-        forearm.position.y = -0.24;
-        shoulder.add(forearm);
-        const lower = new THREE.Mesh(geometry('forearm', () => new THREE.CapsuleGeometry(0.046, 0.18, 4, 8)), material);
-        lower.position.y = -0.11;
-        forearm.add(lower);
-        return { shoulder, forearm };
+        const shoulder = joint(body, [side * 0.218, 0.415, 0]);
+        mesh(shoulder, tailored('sleeve', [[-0.27, 0.061, 0.062], [-0.18, 0.075, 0.073], [-0.045, 0.089, 0.083], [0.034, 0.062, 0.062]]), sleeve);
+        const elbow = joint(shoulder, [0, -0.267, 0]);
+        mesh(elbow, tailored('lower-sleeve', [[-0.245, 0.045, 0.047], [-0.16, 0.065, 0.062], [0.015, 0.065, 0.064]]), sleeve);
+        box(elbow, trim, [0, -0.226, 0], [0.09, 0.06, 0.09]);
+        const hand = joint(elbow, [0, -0.285, 0.004]);
+        hand.name = side < 0 ? 'left-hand' : 'right-hand';
+        oval(hand, skin, [0, -0.004, 0], [0.045, 0.065, 0.027]);
+        oval(hand, skin, [-side * 0.039, 0.007, 0.012], [0.018, 0.033, 0.025]);
+        return { shoulder, elbow, hand };
     });
-
+    mesh(hips, tailored('jeans-seat', [[-0.145, 0.14, 0.093], [-0.075, 0.17, 0.112], [0.025, 0.163, 0.10]]), denim);
+    for (const side of [-1, 1]) box(hips, seams, [side * 0.084, -0.083, -0.099], [0.063, 0.074, 0.011]);
     const legs = [-1, 1].map((side) => {
-        const hip = new THREE.Group();
-        hip.position.set(side * 0.09, 0, 0);
-        hips.add(hip);
-        const thigh = new THREE.Mesh(geometry('thigh', () => new THREE.CapsuleGeometry(0.075, 0.28, 4, 8)), material);
-        thigh.position.y = -0.2;
-        hip.add(thigh);
-        const knee = new THREE.Group();
-        knee.position.y = -0.42;
-        hip.add(knee);
-        const shin = new THREE.Mesh(geometry('shin', () => new THREE.CapsuleGeometry(0.062, 0.3, 4, 8)), material);
-        shin.position.y = -0.18;
-        knee.add(shin);
-        const shoe = new THREE.Mesh(geometry('shoe', () => new THREE.BoxGeometry(0.11, 0.07, 0.24)), material);
-        shoe.position.set(0, -0.36, 0.05);
-        knee.add(shoe);
-        return { hip, knee };
+        const hip = joint(hips, [side * 0.095, -0.018, 0]);
+        mesh(hip, tailored('jeans-thigh', [[-0.44, 0.072, 0.075], [-0.31, 0.087, 0.089], [-0.10, 0.096, 0.103], [0.02, 0.088, 0.096]]), denim);
+        const knee = joint(hip, [0, -0.43, 0]);
+        mesh(knee, tailored('jeans-calf', [[-0.40, 0.061, 0.064], [-0.28, 0.067, 0.07], [-0.12, 0.079, 0.083], [0.015, 0.075, 0.075]]), denim);
+        box(knee, seams, [0, -0.365, 0], [0.123, 0.049, 0.136]);
+        const shoe = joint(knee, [0, -0.398, 0.033]);
+        shoe.name = side < 0 ? 'left-shoe' : 'right-shoe';
+        box(shoe, sole, [0, -0.028, 0.035], [0.142, 0.046, 0.275]);
+        box(shoe, rubber, [0, 0.008, 0.027], [0.135, 0.081, 0.255]);
+        box(shoe, sole, [0, 0.043, 0.058], [0.069, 0.015, 0.082]);
+        for (const side of [-1, 1]) box(shoe, accent, [side * 0.066, 0.01, 0.01], [0.008, 0.022, 0.11]);
+        return { hip, knee, shoe };
     });
-
-    return { root, hips, head, arms, legs, material };
+    mergeDetails(root);
+    return { root, hips, body, head, arms, legs };
 }
 
-/**
- * Two regulars: one hunched over the broken machine giving it a thump, and one
- * slouched on the bench waiting for a turn.
- *
- * Returns a prop: { group, colliders, station, update(dt, camera) }
- */
+// Merge decorative parts on each rigid joint by material. The figures keep
+// their articulated limbs without paying a draw call for every stitch or lace.
+function mergeDetails(root) {
+    root.traverse((node) => {
+        const batches = new Map();
+        for (const child of node.children) {
+            if (!child.isMesh) continue;
+            if (!batches.has(child.material)) batches.set(child.material, []);
+            batches.get(child.material).push(child);
+        }
+        for (const [mat, parts] of batches) {
+            if (parts.length < 2) continue;
+            const copies = parts.map((part) => {
+                part.updateMatrix();
+                const g = part.geometry.index ? part.geometry.toNonIndexed() : part.geometry.clone();
+                g.deleteAttribute('uv');
+                return g.applyMatrix4(part.matrix);
+            });
+            const merged = mergeGeometries(copies);
+            copies.forEach((g) => g.dispose());
+            parts.forEach((part) => node.remove(part));
+            node.add(new THREE.Mesh(merged, mat));
+        }
+    });
+}
+
+// Two-bone IK. Hands stay on the panel / knees while the shoulders breathe.
+// The downward elbow pole also lets a seated forearm turn naturally inward.
+const down = new THREE.Vector3(0, -1, 0);
+const targetPoint = new THREE.Vector3();
+const direction = new THREE.Vector3();
+const pole = new THREE.Vector3();
+const upperDirection = new THREE.Vector3();
+const lowerDirection = new THREE.Vector3();
+const inverse = new THREE.Quaternion();
+const palm = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+function reach(figure, index, x, y, z) {
+    const arm = figure.arms[index];
+    targetPoint.set(x, y, z);
+    figure.body.worldToLocal(figure.root.localToWorld(targetPoint));
+    direction.copy(targetPoint).sub(arm.shoulder.position);
+    const upper = 0.267, lower = 0.285;
+    const distance = THREE.MathUtils.clamp(direction.length(), 0.05, upper + lower - 0.002);
+    direction.normalize();
+    const along = (upper * upper - lower * lower + distance * distance) / (2 * distance);
+    const bend = Math.sqrt(Math.max(0, upper * upper - along * along));
+    pole.copy(down).addScaledVector(direction, -down.dot(direction)).normalize();
+    upperDirection.copy(direction).multiplyScalar(along).addScaledVector(pole, bend);
+    lowerDirection.copy(direction).multiplyScalar(distance).sub(upperDirection).normalize();
+    arm.shoulder.quaternion.setFromUnitVectors(down, upperDirection.normalize());
+    inverse.copy(arm.shoulder.quaternion).invert();
+    lowerDirection.applyQuaternion(inverse);
+    arm.elbow.quaternion.setFromUnitVectors(down, lowerDirection);
+    inverse.copy(figure.body.quaternion).multiply(arm.shoulder.quaternion).multiply(arm.elbow.quaternion).invert();
+    arm.hand.quaternion.copy(inverse).multiply(palm);
+}
+function footprint(root, x, z, w, d) {
+    const corners = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]
+        .map(([dx, dz]) => root.localToWorld(new THREE.Vector3(x + dx, 0, z + dz)));
+    return {
+        minX: Math.min(...corners.map((p) => p.x)), maxX: Math.max(...corners.map((p) => p.x)),
+        minZ: Math.min(...corners.map((p) => p.z)), maxZ: Math.max(...corners.map((p) => p.z)),
+    };
+}
+function contactShadow(root, x, z, w, d) {
+    const mat = new THREE.ShaderMaterial({
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `varying vec2 vUv; void main() { float a = exp(-dot(vUv, vUv) * 3.7) * 0.55; gl_FragColor = vec4(0.005, 0.003, 0.01, a * (1.0 - smoothstep(0.75, 1.0, length(vUv)))); }`,
+        transparent: true, depthWrite: false,
+    });
+    const shadow = mesh(root, geometry('shadow', () => new THREE.PlaneGeometry(1, 1)), mat, [x, 0.024, z], [w, d, 1]);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.renderOrder = 3;
+}
+
 export function createPatrons({ brokenCabinet, bench }) {
     const group = new THREE.Group();
+    group.name = 'arcade-regulars';
+    const colliders = [];
     const people = [];
-
-    // ---- the one hammering the out-of-order machine -------------------------
+    let time = 0;
     if (brokenCabinet) {
-        const figure = buildFigure({ skin: '#0c0910', rim: '#9d7bff', height: 1.02 });
-        const stand = brokenCabinet.group.localToWorld(new THREE.Vector3(0.06, 0, 1.28));
-        figure.root.position.copy(stand);
-        figure.root.position.y = 0;
-        figure.root.rotation.y = brokenCabinet.group.rotation.y + Math.PI;
-        group.add(figure.root);
-        people.push({
-            figure,
-            phase: Math.random() * 10,
-            // Idle at the machine, then occasionally whack it in frustration.
-            thumpTimer: 4 + Math.random() * 5,
-            thump: 0,
-            update(dt, self) {
-                const f = self.figure;
-                self.phase += dt;
-                const breathe = Math.sin(self.phase * 1.6) * 0.012;
-                f.hips.position.y = 0.92 + breathe;
-                f.hips.rotation.x = 0.12 + Math.sin(self.phase * 0.8) * 0.02;
-                f.head.rotation.x = -0.12 + Math.sin(self.phase * 0.5) * 0.04;
-
-                self.thumpTimer -= dt;
-                if (self.thumpTimer <= 0) {
-                    self.thumpTimer = 5 + Math.random() * 7;
-                    self.thump = 1;
-                }
-                // A quick wind-up and strike, then back to resting on the panel.
-                self.thump = Math.max(0, self.thump - dt * 2.2);
-                const strike = Math.sin(Math.min(1, 1 - self.thump) * Math.PI);
-                f.arms.forEach((arm, i) => {
-                    const rest = -1.15 + (i === 0 ? 0.05 : -0.05);
-                    arm.shoulder.rotation.x = rest - strike * 0.5 * (i === 1 ? 1 : 0.2);
-                    arm.shoulder.rotation.z = (i ? -1 : 1) * 0.18;
-                    arm.forearm.rotation.x = -0.55 + strike * 0.35 * (i === 1 ? 1 : 0.2);
-                });
-                f.legs.forEach((leg, i) => {
-                    leg.hip.rotation.x = i === 0 ? 0.04 : -0.06;
-                    leg.knee.rotation.x = 0.05;
-                });
-                return self.thump > 0.96 ? 'thump' : null;
-            },
-        });
+        const f = buildFigure();
+        f.root.name = 'regular-bomber-jacket';
+        const stand = brokenCabinet.group.localToWorld(new THREE.Vector3(0.04, 0, 1.56));
+        f.root.position.copy(stand);
+        f.root.rotation.y = brokenCabinet.group.rotation.y + Math.PI;
+        group.add(f.root);
+        // Slightly staggered, planted feet. Breathing belongs in the chest.
+        f.legs[0].hip.position.z = 0.055;
+        f.legs[1].hip.position.z = -0.045;
+        contactShadow(f.root, 0, 0.07, 0.72, 0.76);
+        colliders.push(footprint(f.root, 0, 0.02, 0.52, 0.45));
+        let previousPhase = 0;
+        people.push({ figure: f, update() {
+            const cycle = time % 14;
+            // A small button press, then a patient glance at the failed screen.
+            const press = cycle > 9.0 && cycle < 9.6 ? Math.sin((cycle - 9.0) / 0.6 * Math.PI) : 0;
+            f.body.rotation.x = 0.09 + Math.sin(time * 1.25) * 0.006;
+            f.body.position.y = Math.sin(time * 1.65) * 0.002;
+            f.head.rotation.x = -0.06 + press * 0.1;
+            f.head.rotation.y = Math.sin(time * 0.33) * 0.055;
+            f.root.updateMatrixWorld(true);
+            reach(f, 0, -0.19, 1.0, 0.46);
+            reach(f, 1, 0.16, 1.006 - press * 0.014, 0.44);
+            const tap = cycle >= 9.28 && previousPhase < 9.28;
+            previousPhase = cycle;
+            return tap;
+        } });
     }
-
-    // ---- the one resting on the bench ---------------------------------------
     if (bench) {
-        const figure = buildFigure({ skin: '#0a0810', rim: '#59d8ff', height: 0.98 });
-        figure.root.position.set(bench.x, 0, bench.z);
-        figure.root.rotation.y = bench.rotationY;
-        // Sitting: drop the hips to seat height and fold the legs.
-        figure.hips.position.y = 0.52;
-        figure.legs.forEach((leg) => {
-            leg.hip.rotation.x = -Math.PI / 2.1;
-            leg.knee.rotation.x = Math.PI / 2.2;
+        const f = buildFigure({ seated: true });
+        f.root.name = 'regular-headphones';
+        f.root.position.set(bench.x, 0, bench.z);
+        f.root.rotation.y = bench.rotationY;
+        f.legs.forEach((leg, i) => {
+            leg.hip.rotation.x = -1.31;
+            leg.hip.rotation.z = i ? 0.045 : -0.045;
+            leg.knee.rotation.x = 1.31;
         });
-        group.add(figure.root);
-        people.push({
-            figure,
-            phase: Math.random() * 10,
-            lookTimer: 2,
-            lookTarget: 0,
-            update(dt, self) {
-                const f = self.figure;
-                self.phase += dt;
-                f.hips.position.y = 0.52 + Math.sin(self.phase * 1.4) * 0.008;
-                f.hips.rotation.x = 0.08;
-
-                // Glances around the room now and then.
-                self.lookTimer -= dt;
-                if (self.lookTimer <= 0) {
-                    self.lookTimer = 3 + Math.random() * 5;
-                    self.lookTarget = (Math.random() - 0.5) * 1.1;
-                }
-                f.head.rotation.y += (self.lookTarget - f.head.rotation.y) * Math.min(1, dt * 2.5);
-                f.head.rotation.z = Math.sin(self.phase * 0.7) * 0.03;
-                f.arms.forEach((arm, i) => {
-                    arm.shoulder.rotation.x = -0.35;
-                    arm.shoulder.rotation.z = (i ? -1 : 1) * 0.3;
-                    arm.forearm.rotation.x = -1.1 + Math.sin(self.phase * 0.9 + i) * 0.05;
-                });
-                return null;
-            },
-        });
+        group.add(f.root);
+        contactShadow(f.root, 0, 0.4, 0.8, 0.75);
+        colliders.push(footprint(f.root, 0, 0.30, 0.57, 0.72));
+        people.push({ figure: f, update() {
+            f.body.rotation.x = 0.13 + Math.sin(time * 1.3) * 0.007;
+            f.body.position.y = Math.sin(time * 1.5) * 0.002;
+            // Listening to the jukebox across the aisle: a relaxed nod, not a bob
+            // of the entire body, with hands resting on the knees.
+            f.head.rotation.x = 0.10 + Math.sin(time * 2.15) * 0.017;
+            f.head.rotation.y = -0.13 + Math.sin(time * 0.23) * 0.10;
+            f.head.rotation.z = -0.025;
+            f.root.updateMatrixWorld(true);
+            reach(f, 0, -0.13, 0.56, 0.34);
+            reach(f, 1, 0.13, 0.56, 0.34);
+            return false;
+        } });
     }
-
-    return {
-        group,
-        colliders: [],
-        station: null,
-        onThump: null,
+    const prop = {
+        group, colliders, station: null, onThump: null,
         update(dt) {
+            time += Math.min(Math.max(dt, 0), 0.1);
             for (const person of people) {
-                const event = person.update(dt, person);
-                if (event === 'thump' && this.onThump) this.onThump(person.figure.root.position);
+                if (person.update() && this.onThump) this.onThump(person.figure.root.position);
             }
         },
     };
+    prop.update(0);
+    return prop;
 }

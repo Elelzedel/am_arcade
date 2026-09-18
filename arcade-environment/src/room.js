@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import {
     createCarpetTextures, createWallTexture, createCeilingTexture,
-    createNeonSignTexture, createPosterTexture, createSodaFrontTexture,
+    createNeonSignTexture, createPosterTexture,
 } from './textures.js';
 import { createClawMachine } from './props/clawMachine.js';
 import { createJukebox } from './props/jukebox.js';
+import { createChangeMachine, createSodaMachine, createTrashCan } from './props/utilityMachines.js';
 import { createPatrons } from './props/patrons.js';
 import { getAudioReactive } from './audioReactive.js';
 import { createAtmosphere } from './atmosphere.js';
@@ -110,6 +111,9 @@ export function buildRoom(scene, { games }) {
     const H = ROOM.height;
     const cx = (ROOM.minX + ROOM.maxX) / 2;
     const cz = (ROOM.minZ + ROOM.maxZ) / 2;
+    // Shared anchors keep wall decor and seated/interactive props aligned.
+    const seating = { x: ROOM.maxX - 0.35, z: 2.8 };
+    const jukeboxZ = 2.6;
 
     // Neon trim breathes with whatever the jukebox is playing; filled in as the
     // trim is built below.
@@ -168,11 +172,26 @@ export function buildRoom(scene, { games }) {
         const top = box(along ? wall.w : 0.04, 0.04, along ? 0.04 : wall.w, neonMaterial(color, 2.5), wall.x + inward.x * 0.03, H - 0.25, wall.z + inward.z * 0.03);
         scene.add(top);
         pulsing.push({ material: top.material, base: top.material.color.clone() });
-        const base = box(along ? wall.w : 0.03, 0.12, along ? 0.03 : wall.w, new THREE.MeshStandardMaterial({ color: 0x08060e }), wall.x + inward.x * 0.015, 0.06, wall.z + inward.z * 0.015);
-        scene.add(base);
-        const baseLine = box(along ? wall.w : 0.02, 0.012, along ? 0.02 : wall.w, neonMaterial(color, 1.6), wall.x + inward.x * 0.035, 0.12, wall.z + inward.z * 0.035);
-        scene.add(baseLine);
-        pulsing.push({ material: baseLine.material, base: baseLine.material.color.clone() });
+        // Stop the baseboard and floor lighting at the entrance jambs. A
+        // continuous strip here would pass straight through both glass doors.
+        const entrance = wall.ry === Math.PI;
+        const opening = 2.76;
+        const sideWidth = (wall.w - opening) / 2;
+        const runs = entrance
+            ? [-1, 1].map(side => ({ w: sideWidth, x: cx + side * (opening + sideWidth) / 2, z: wall.z }))
+            : [wall];
+        for (const [i, run] of runs.entries()) {
+            const base = box(along ? run.w : 0.03, 0.12, along ? 0.03 : run.w,
+                new THREE.MeshStandardMaterial({ color: 0x08060e }),
+                run.x + inward.x * 0.015, 0.06, run.z + inward.z * 0.015);
+            base.name = entrance ? `entrance-baseboard-${i}` : 'wall-baseboard';
+            scene.add(base);
+            const baseLine = box(along ? run.w : 0.02, 0.012, along ? 0.02 : run.w,
+                neonMaterial(color, 1.6), run.x + inward.x * 0.035, 0.12, run.z + inward.z * 0.035);
+            baseLine.name = entrance ? `entrance-floor-trim-${i}` : 'wall-floor-trim';
+            scene.add(baseLine);
+            pulsing.push({ material: baseLine.material, base: baseLine.material.color.clone() });
+        }
     }
 
     updaters.push((dt) => {
@@ -305,8 +324,8 @@ export function buildRoom(scene, { games }) {
 
     // ---- neon wall signs ------------------------------------------------------
     const wallSigns = [
-        { text: 'GAME ON', color: '#00e5ff', x: ROOM.minX + 0.03, z: 2.8, ry: Math.PI / 2 },
-        { text: 'INSERT COIN', color: '#ffb000', x: ROOM.maxX - 0.03, z: 2.8, ry: -Math.PI / 2 },
+        { text: 'GAME ON', color: '#00e5ff', x: ROOM.minX + 0.03, z: jukeboxZ, ry: Math.PI / 2 },
+        { text: 'INSERT COIN', color: '#ffb000', x: ROOM.maxX - 0.03, z: seating.z, ry: -Math.PI / 2 },
     ];
     for (const sign of wallSigns) {
         const tex = createNeonSignTexture(sign.text, sign.color, { width: 1024, height: 192, size: 84 });
@@ -327,8 +346,7 @@ export function buildRoom(scene, { games }) {
     {
         const benchMat = new THREE.MeshStandardMaterial({ color: 0x3a1f5c, roughness: 0.6 });
         const legMat = new THREE.MeshStandardMaterial({ color: 0x222228, metalness: 0.8, roughness: 0.3 });
-        const x = ROOM.maxX - 0.35;
-        const z = 2.8;
+        const { x, z } = seating;
         scene.add(box(0.45, 0.08, 1.5, benchMat, x, 0.45, z));
         scene.add(box(0.06, 0.45, 1.5, benchMat, x + 0.2, 0.72, z));
         for (const dz of [-0.65, 0.65]) scene.add(box(0.4, 0.42, 0.05, legMat, x, 0.21, z + dz));
@@ -339,7 +357,7 @@ export function buildRoom(scene, { games }) {
     const stations = [];
     const props = [
         createClawMachine({ position: new THREE.Vector3(ROOM.maxX - 0.55, 0, -0.6), rotationY: -Math.PI / 2 }),
-        createJukebox({ position: new THREE.Vector3(ROOM.minX + 0.35, 0, 2.6), rotationY: Math.PI / 2 }),
+        createJukebox({ position: new THREE.Vector3(ROOM.minX + 0.35, 0, jukeboxZ), rotationY: Math.PI / 2 }),
     ];
     for (const prop of props) {
         scene.add(prop.group);
@@ -352,57 +370,18 @@ export function buildRoom(scene, { games }) {
     const atmosphere = createAtmosphere(scene, { room: ROOM });
     updaters.push((dt, camera) => atmosphere.update(dt, camera));
 
-    // ---- change machine --------------------------------------------------------
-    {
-        const g = new THREE.Group();
-        g.position.set(ROOM.minX + 0.3, 0, 4.9);
-        g.rotation.y = Math.PI / 2;
-        const body = box(0.7, 1.7, 0.55, new THREE.MeshStandardMaterial({ color: 0x9aa0a8, metalness: 0.7, roughness: 0.35 }), 0, 0.85, 0);
-        g.add(body);
-        const labelTex = createNeonSignTexture('CHANGE', '#ffe066', { width: 256, height: 80, size: 30 });
-        const label = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.19), new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, toneMapped: false }));
-        label.position.set(0, 1.45, 0.28);
-        g.add(label);
-        g.add(box(0.3, 0.12, 0.02, neonMaterial('#39ff14', 1.2), 0, 1.1, 0.28));
-        g.add(box(0.25, 0.1, 0.06, new THREE.MeshStandardMaterial({ color: 0x222222 }), 0, 0.45, 0.28));
-        scene.add(g);
-        colliders.push({ minX: ROOM.minX, maxX: ROOM.minX + 0.6, minZ: 4.5, maxZ: 5.3 });
-    }
-
-    // ---- soda machine ---------------------------------------------------------
-    {
-        const g = new THREE.Group();
-        g.position.set(ROOM.minX + 0.42, 0, -0.9);
-        g.rotation.y = Math.PI / 2;
-        g.add(box(0.95, 1.9, 0.8, new THREE.MeshStandardMaterial({ color: 0xb3122e, roughness: 0.35, metalness: 0.3 }), 0, 0.95, 0));
-        const frontTex = createSodaFrontTexture();
-        const front = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.6, 1.3),
-            new THREE.MeshStandardMaterial({ map: frontTex, emissiveMap: frontTex, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0.8, roughness: 0.2 }),
-        );
-        front.position.set(-0.1, 1.15, 0.401);
-        g.add(front);
-        // selection buttons and coin slot
-        for (let i = 0; i < 6; i++) {
-            g.add(box(0.12, 0.08, 0.02, neonMaterial('#ffe066', 0.9), 0.35, 1.6 - i * 0.14, 0.41));
-        }
-        g.add(box(0.5, 0.18, 0.05, new THREE.MeshStandardMaterial({ color: 0x111111 }), -0.1, 0.25, 0.4));
-        const glow = new THREE.PointLight(0xff3048, 1.2, 2.5, 1.5);
-        glow.position.set(0, 1.2, 0.9);
-        g.add(glow);
-        scene.add(g);
-        colliders.push({ minX: ROOM.minX, maxX: ROOM.minX + 0.85, minZ: -1.4, maxZ: -0.4 });
-    }
-
-    // ---- trash can ----------------------------------------------------------------
-    {
-        const can = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.22, 0.19, 0.7, 20, 1, true),
-            new THREE.MeshStandardMaterial({ color: 0x223344, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }),
-        );
-        can.position.set(ROOM.maxX - 0.35, 0.35, 4.9);
-        scene.add(can);
-        colliders.push(colliderFromBox(ROOM.maxX - 0.35, 4.9, 0.44, 0.44));
+    // Service machines sit in dedicated wall bays. The changer is beyond the
+    // poster's right edge, with over half a metre of clear wall between them.
+    const utilities = [
+        createChangeMachine({ position: new THREE.Vector3(ROOM.minX + 0.36, 0, 5.45), rotationY: Math.PI / 2 }),
+        createSodaMachine({ position: new THREE.Vector3(ROOM.minX + 0.43, 0, -0.9), rotationY: Math.PI / 2 }),
+        // Bin beside the drinks, clear of both the machine's front and wall art.
+        createTrashCan({ position: new THREE.Vector3(ROOM.minX + 0.36, 0, 0.25), rotationY: Math.PI / 2 }),
+    ];
+    for (const prop of utilities) {
+        scene.add(prop.group);
+        colliders.push(...prop.colliders);
+        props.push(prop);
     }
 
     // Every point light in the room, gathered once the props and cabinets are
@@ -448,9 +427,10 @@ export function buildRoom(scene, { games }) {
             // A couple of regulars, so the place isn't deserted.
             const patrons = createPatrons({
                 brokenCabinet: cabinets.find((c) => c.broken),
-                bench: { x: ROOM.maxX - 0.42, z: 2.55, rotationY: -Math.PI / 2 },
+                bench: { x: seating.x - 0.07, z: seating.z - 0.25, rotationY: -Math.PI / 2 },
             });
             scene.add(patrons.group);
+            colliders.push(...patrons.colliders);
             updaters.push((dt) => patrons.update(dt));
             props.push(patrons);
             collectLights();
