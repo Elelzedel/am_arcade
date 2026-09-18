@@ -1,239 +1,151 @@
 import * as THREE from 'three';
-import { ObjectPool } from '../systems/objectPool.js';
+import { TUNNEL_RADIUS } from '../config.js';
 
-class Tunnel {
-    constructor(scene) {
+const LENGTH = 440;           // wall cylinder length
+const BEHIND = 30;            // how far the wall extends behind the ship
+const PANEL_LEN = 12;         // grid tile length along the tunnel
+const RING_SPACING = 12;
+const RING_COUNT = 34;
+const LINE_COUNT = 70;
+
+// The glass tunnel: a scrolling grid wall, neon rings with travelling light
+// pulses, and speed streaks. Everything uses shared basic materials + fog.
+export class Tunnel {
+    constructor(scene, gridTexture) {
         this.scene = scene;
-        this.segments = [];
-        this.objectPool = new ObjectPool(scene);
-        this.segmentLength = 50;
-        this.segmentCount = 20;
-        this.radius = 20;
-        this.currentZ = 0;
-        this.lastObstacleZ = 0;
-        
-        // Materials
-        this.createMaterials();
-        
-        // Create initial tunnel segments
-        this.initializeTunnel();
-    }
-    
-    createMaterials() {
-        // More visible tunnel material with wireframe overlay
-        this.tunnelMaterial = new THREE.MeshPhysicalMaterial({
-            color: 0x1a1a3e,
-            metalness: 0.3,
-            roughness: 0.4,
-            transmission: 0.3,
-            thickness: 0.5,
-            opacity: 0.9,
+        this.color = new THREE.Color(0x00e5ff);
+        this.pulse = 0;
+
+        // Glass wall.
+        this.gridTexture = gridTexture;
+        gridTexture.repeat.set(16, LENGTH / PANEL_LEN);
+        this.wallGeometry = new THREE.CylinderGeometry(TUNNEL_RADIUS, TUNNEL_RADIUS, LENGTH, 48, 1, true);
+        this.wallGeometry.rotateX(Math.PI / 2);
+        this.wallMaterial = new THREE.MeshBasicMaterial({
+            color: this.color,
+            map: gridTexture,
             transparent: true,
-            side: THREE.DoubleSide
+            opacity: 0.55,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
         });
-        
-        // Wireframe material for better visibility
-        this.wireframeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x5ac8fa,
-            wireframe: true,
+        this.wall = new THREE.Mesh(this.wallGeometry, this.wallMaterial);
+        this.wall.position.z = BEHIND - LENGTH / 2;
+        this.wall.renderOrder = -1;
+        scene.add(this.wall);
+
+        // Neon rings.
+        this.ringGeometry = new THREE.TorusGeometry(TUNNEL_RADIUS - 0.05, 0.13, 4, 64);
+        this.ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        this.rings = new THREE.InstancedMesh(this.ringGeometry, this.ringMaterial, RING_COUNT);
+        this.rings.frustumCulled = false;
+        this.rings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.tmpMatrix = new THREE.Matrix4();
+        this.tmpColor = new THREE.Color();
+        for (let i = 0; i < RING_COUNT; i++) this.rings.setColorAt(i, this.color);
+        scene.add(this.rings);
+
+        // Speed streaks.
+        this.lines = [];
+        const positions = new Float32Array(LINE_COUNT * 6);
+        const colors = new Float32Array(LINE_COUNT * 6);
+        this.lineGeometry = new THREE.BufferGeometry();
+        this.lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+        this.lineGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        this.lineMaterial = new THREE.LineBasicMaterial({
+            vertexColors: true,
             transparent: true,
-            opacity: 0.3
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
         });
-        
-        // Neon edge material - using MeshStandardMaterial for emissive support
-        this.edgeMaterial = new THREE.MeshStandardMaterial({
-            color: 0x5ac8fa,
-            emissive: 0x5ac8fa,
-            emissiveIntensity: 2,
-            roughness: 0.2,
-            metalness: 0.8,
-            side: THREE.DoubleSide
-        });
-    }
-    
-    createTunnelSegment(zPosition) {
-        const segment = new THREE.Group();
-        
-        // Create cylinder geometry for tunnel
-        const geometry = new THREE.CylinderGeometry(
-            this.radius,
-            this.radius,
-            this.segmentLength,
-            32,
-            1,
-            true
-        );
-        
-        // Rotate to align with Z axis
-        geometry.rotateX(Math.PI / 2);
-        
-        // Create mesh with solid material
-        const mesh = new THREE.Mesh(geometry, this.tunnelMaterial);
-        mesh.position.z = zPosition;
-        segment.add(mesh);
-        
-        // Add wireframe overlay for better visibility
-        const wireframeMesh = new THREE.Mesh(geometry, this.wireframeMaterial);
-        wireframeMesh.position.z = zPosition;
-        segment.add(wireframeMesh);
-        
-        // Add neon edges
-        const edgeGeometry = new THREE.TorusGeometry(this.radius, 0.5, 8, 32);
-        
-        // Front edge
-        const frontEdge = new THREE.Mesh(edgeGeometry, this.edgeMaterial);
-        frontEdge.position.z = zPosition + this.segmentLength / 2;
-        segment.add(frontEdge);
-        
-        // Back edge
-        const backEdge = new THREE.Mesh(edgeGeometry, this.edgeMaterial);
-        backEdge.position.z = zPosition - this.segmentLength / 2;
-        segment.add(backEdge);
-        
-        // Add some random neon strips for visual interest
-        this.addNeonStrips(segment, zPosition);
-        
-        return {
-            group: segment,
-            z: zPosition,
-            mesh: mesh
-        };
-    }
-    
-    addNeonStrips(segment, zPosition) {
-        const stripCount = 4;
-        const stripGeometry = new THREE.BoxGeometry(0.2, 0.2, this.segmentLength);
-        
-        for (let i = 0; i < stripCount; i++) {
-            const angle = (i / stripCount) * Math.PI * 2;
-            const strip = new THREE.Mesh(stripGeometry, this.edgeMaterial);
-            
-            strip.position.x = Math.cos(angle) * (this.radius - 0.5);
-            strip.position.y = Math.sin(angle) * (this.radius - 0.5);
-            strip.position.z = zPosition;
-            
-            segment.add(strip);
+        this.lineMesh = new THREE.LineSegments(this.lineGeometry, this.lineMaterial);
+        this.lineMesh.frustumCulled = false;
+        scene.add(this.lineMesh);
+        for (let i = 0; i < LINE_COUNT; i++) {
+            this.lines.push({ x: 0, y: 0, s: 0 });
         }
+        this.reset(0);
     }
-    
-    initializeTunnel() {
-        // Create initial segments
-        for (let i = 0; i < this.segmentCount; i++) {
-            const zPos = -i * this.segmentLength;
-            const segment = this.createTunnelSegment(zPos);
-            this.segments.push(segment);
-            this.scene.add(segment.group);
+
+    reset(distance) {
+        for (const line of this.lines) this.respawnLine(line, distance, Math.random() * 260);
+        this.pulse = 0;
+    }
+
+    respawnLine(line, distance, ahead) {
+        const a = Math.random() * Math.PI * 2;
+        const r = 4 + Math.random() * 5.6;
+        line.x = Math.cos(a) * r;
+        line.y = Math.sin(a) * r;
+        line.s = distance + ahead;
+        line.bright = 0.5 + Math.random() * 0.5;
+    }
+
+    setColor(color) {
+        this.color.copy(color);
+    }
+
+    // Fire a bright pulse wave down the tunnel (sector change, boost...).
+    flash(amount = 1) {
+        this.pulse = Math.max(this.pulse, amount);
+    }
+
+    update(dt, distance, speed, time, boost) {
+        this.pulse = Math.max(0, this.pulse - dt * 1.5);
+        this.gridTexture.offset.y = -(distance / PANEL_LEN) % 1;
+
+        // Rings: travelling light wave, faster with speed.
+        const base = Math.floor(distance / RING_SPACING);
+        const colors = this.rings.instanceColor;
+        for (let i = 0; i < RING_COUNT; i++) {
+            const s = (base + i) * RING_SPACING;
+            const z = distance - s;
+            this.tmpMatrix.makeTranslation(0, 0, z);
+            this.rings.setMatrixAt(i, this.tmpMatrix);
+            const wave = Math.cos(s * 0.035 + time * 7);
+            let k = 0.28 + 0.9 * Math.pow(Math.max(0, wave), 12);
+            if ((base + i) % 8 === 0) k += 0.35;
+            k += this.pulse * 0.8;
+            this.tmpColor.copy(this.color).multiplyScalar(Math.min(1.6, k));
+            colors.setXYZ(i, this.tmpColor.r, this.tmpColor.g, this.tmpColor.b);
         }
-        
-        this.currentZ = 0;
-    }
-    
-    update(deltaTime, speed) {
-        // Move tunnel segments towards player
-        this.currentZ += speed * deltaTime;
-        
-        this.segments.forEach(segment => {
-            segment.group.position.z += speed * deltaTime;
-            
-            // If segment has passed the camera, move it to the back
-            if (segment.group.position.z > this.segmentLength) {
-                // Find the furthest segment
-                let furthestZ = -Infinity;
-                this.segments.forEach(s => {
-                    if (s.group.position.z < furthestZ || furthestZ === -Infinity) {
-                        furthestZ = s.group.position.z;
-                    }
-                });
-                
-                // Move this segment to the back
-                segment.group.position.z = furthestZ - this.segmentLength;
-                
-                // Randomize the segment slightly for variety
-                this.randomizeSegment(segment);
-            }
-        });
-        
-        // Update obstacles using object pool
-        this.objectPool.update(deltaTime, speed);
-        
-        // Spawn new obstacles
-        const distanceSinceLastObstacle = Math.abs(this.currentZ - this.lastObstacleZ);
-        const minDistance = 150 - Math.min(speed / 5, 80); // More space between obstacles, scales with speed
-        
-        if (distanceSinceLastObstacle > minDistance && Math.random() > 0.4) {
-            this.spawnObstacle();
-            this.lastObstacleZ = this.currentZ;
+        this.rings.instanceMatrix.needsUpdate = true;
+        colors.needsUpdate = true;
+
+        this.wallMaterial.opacity = 0.45 + this.pulse * 0.4;
+
+        // Speed streaks: stretch with speed, fade in above cruising speed.
+        const pos = this.lineGeometry.attributes.position.array;
+        const col = this.lineGeometry.attributes.color.array;
+        const len = 2 + speed * (0.07 + boost * 0.06);
+        const intensity = Math.min(1, Math.max(0.15, (speed - 40) / 70)) * (1 + boost * 0.6);
+        const c = this.color;
+        for (let i = 0; i < LINE_COUNT; i++) {
+            const line = this.lines[i];
+            if (line.s < distance - 6) this.respawnLine(line, distance, 150 + Math.random() * 120);
+            const z = distance - line.s;
+            const o = i * 6;
+            pos[o] = line.x; pos[o + 1] = line.y; pos[o + 2] = z;
+            pos[o + 3] = line.x; pos[o + 4] = line.y; pos[o + 5] = z + len;
+            const b = intensity * line.bright;
+            // Head is white-hot, tail tinted with the tunnel colour.
+            col[o] = b; col[o + 1] = b; col[o + 2] = b;
+            col[o + 3] = c.r * b * 0.4; col[o + 4] = c.g * b * 0.4; col[o + 5] = c.b * b * 0.4;
         }
+        this.lineGeometry.attributes.position.needsUpdate = true;
+        this.lineGeometry.attributes.color.needsUpdate = true;
+        this.lineMaterial.opacity = Math.min(1, 0.35 + boost * 0.5);
     }
-    
-    randomizeSegment(segment) {
-        // Add slight variations to make the tunnel more interesting
-        // This could include changing colors, adding obstacles, etc.
-        // For now, just change the neon color slightly
-        const hue = Math.random() * 0.2 + 0.5; // Blue to cyan range
-        const color = new THREE.Color().setHSL(hue, 1, 0.5);
-        
-        segment.group.children.forEach(child => {
-            if (child.material === this.edgeMaterial) {
-                child.material = child.material.clone();
-                child.material.color = color;
-                if (child.material.emissive !== undefined) {
-                    child.material.emissive = color;
-                }
-            }
-        });
-    }
-    
-    spawnObstacle() {
-        const types = ['barrier', 'rotating', 'moving'];
-        const type = types[Math.floor(Math.random() * types.length)];
-        
-        const position = new THREE.Vector3(
-            0,
-            0,
-            -300 // Spawn far ahead
-        );
-        
-        // Use object pool to get obstacle
-        this.objectPool.getObstacle(type, position);
-    }
-    
-    reset() {
-        // Remove all segments
-        this.segments.forEach(segment => {
-            this.scene.remove(segment.group);
-        });
-        this.segments = [];
-        
-        // Reset object pool
-        this.objectPool.reset();
-        
-        // Reset obstacle tracking
-        this.lastObstacleZ = 0;
-        
-        // Recreate tunnel
-        this.initializeTunnel();
-    }
-    
+
     dispose() {
-        this.segments.forEach(segment => {
-            segment.group.traverse(child => {
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach(mat => mat.dispose());
-                    } else {
-                        child.material.dispose();
-                    }
-                }
-            });
-            this.scene.remove(segment.group);
-        });
-        this.segments = [];
-        
-        // Dispose object pool
-        this.objectPool.dispose();
+        this.wallGeometry.dispose();
+        this.wallMaterial.dispose();
+        this.ringGeometry.dispose();
+        this.ringMaterial.dispose();
+        this.rings.dispose();
+        this.lineGeometry.dispose();
+        this.lineMaterial.dispose();
     }
 }
-
-export { Tunnel };

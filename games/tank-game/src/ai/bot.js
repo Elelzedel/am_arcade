@@ -1,237 +1,167 @@
+import { integrate, launchVelocity, WEAPONS, gaussian, clamp, randRange } from '../utils/physics.js';
+import { checkImpact } from '../entities/projectile.js';
+
+const SIM_DT = 1 / 120;
+const SIM_MAX_STEPS = 120 * 8;
+const ELEVATIONS = [48, 58, 38, 68, 28, 76, 18, 84];
+
+// How good the CPU is at a given stage (1-based). Stage 1 is sloppy and
+// mostly ignores wind; each stage it aims tighter and learns faster.
+export function skillForStage(stage) {
+    const k = stage - 1;
+    return {
+        powerErr: Math.max(1.5, 10 - 1.4 * k),
+        angleErr: Math.max(0.6, 5 - 0.8 * k),
+        windKnowledge: Math.min(1, 0.2 + 0.15 * k),
+        learn: Math.max(0.55, 0.85 - 0.05 * k),
+        floor: Math.max(0.25, 0.6 - 0.06 * k),
+        smart: stage >= 3,
+    };
+}
+
+/**
+ * Frame-driven CPU turn: think (a few simulations per frame), swing the
+ * barrel and power over about a second, pause, then report it wants to fire.
+ * No timers or promises, so the game can drop it at any moment.
+ */
 export default class TankBot {
-    constructor(tank, opponent, terrain, difficulty = 'medium', gameInstance = null) {
+    constructor(tank, skill) {
         this.tank = tank;
-        this.opponent = opponent;
-        this.terrain = terrain;
-        this.difficulty = difficulty;
-        this.game = gameInstance;
-        
-        // Difficulty settings
-        const difficultySettings = {
-            easy: { accuracy: 0.6, thinkingTime: 2000, errorRange: 30 },
-            medium: { accuracy: 0.75, thinkingTime: 1500, errorRange: 20 },
-            hard: { accuracy: 0.9, thinkingTime: 1000, errorRange: 10 },
-            impossible: { accuracy: 0.99, thinkingTime: 500, errorRange: 1 }
-        };
-        
-        const settings = difficultySettings[difficulty] || difficultySettings.medium;
-        this.accuracy = settings.accuracy;
-        this.thinkingTime = settings.thinkingTime;
-        this.errorRange = settings.errorRange;
-    }
-    
-    simulateShot(angle, power, wind) {
-        const angleRad = (angle * Math.PI) / 180;
-        const velocity = power * 10;
-
-        let projectile = {
-            x: this.tank.x + Math.cos(angleRad) * this.tank.barrelLength,
-            y: this.tank.y - Math.sin(angleRad) * this.tank.barrelLength,
-            vx: Math.cos(angleRad) * velocity,
-            vy: -Math.sin(angleRad) * velocity,
-        };
-
-        const target = this.opponent;
-        const terrain = this.terrain;
-        const gravity = 300;
-        const windSpeed = wind.speed;
-        const deltaTime = 0.016; // Simulate with a fixed time step, e.g., for 60 FPS
-
-        const maxSteps = 1000; // Max simulation time to prevent infinite loops
-        for (let i = 0; i < maxSteps; i++) {
-            projectile.vx += windSpeed * 2 * deltaTime;
-            projectile.vy += gravity * deltaTime;
-            projectile.x += projectile.vx * deltaTime;
-            projectile.y += projectile.vy * deltaTime;
-
-            // Check for collision with terrain
-            if (projectile.y > terrain.getHeightAt(projectile.x)) {
-                return { hit: 'terrain', x: projectile.x, y: projectile.y };
-            }
-
-            // Check for collision with opponent
-            const dx = projectile.x - target.x;
-            const dy = projectile.y - target.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < target.width / 2) { // A simplified hit check
-                return { hit: 'opponent', x: projectile.x, y: projectile.y };
-            }
-
-            // Check if projectile is out of bounds
-            if (projectile.x < 0 || projectile.x > terrain.width || projectile.y > terrain.height) {
-                return { hit: 'out_of_bounds', x: projectile.x, y: projectile.y };
-            }
-        }
-
-        return { hit: 'timeout', x: projectile.x, y: projectile.y }; // If simulation ends
+        this.skill = skill;
+        this.errScale = 1;
+        this.windKnow = skill.windKnowledge;
+        this.phase = 'idle';
     }
 
-    calculateOptimalShot(wind) {
-        // For lower difficulties, there's a chance the bot will "mess up"
-        if (Math.random() > this.accuracy) {
-            console.log("Bot is making a deliberately inaccurate shot.");
-            // Return a somewhat random shot based on its current settings
-            const angleError = (Math.random() - 0.5) * 60; // Large random error
-            const powerError = (Math.random() - 0.5) * 40;
-            return {
-                angle: this.tank.angle + angleError,
-                power: this.tank.power + powerError,
-            };
-        }
+    startTurn(world) {
+        this.world = world; // { terrain, tanks, wind, target }
+        this.phase = 'think';
+        this.timer = randRange(0.35, 0.6);
+        this.candidates = ELEVATIONS.slice();
+        this.best = null;
+        this.pickWeapon();
+    }
 
-        const targetX = this.opponent.x;
-        const targetY = this.opponent.y;
-        let bestShot = null;
-        let minDistance = Infinity;
+    cancel() {
+        this.phase = 'idle';
+        this.world = null;
+    }
 
-        const shootingLeft = targetX < this.tank.x;
-        const angleStep = 2; // Check angles in steps of 2 degrees
+    pickWeapon() {
+        const t = this.tank;
+        const target = this.world.target;
+        let w = 0;
+        if (t.ammo[2] > 0 && this.skill.smart && (target.hp <= 65 || Math.random() < 0.3)) w = 2;
+        else if (t.ammo[2] > 0 && !this.skill.smart && Math.random() < 0.15) w = 2;
+        else if (t.ammo[1] > 0 && Math.random() < 0.35) w = 1;
+        t.weapon = w;
+    }
 
-        // We want to iterate from low-arc to high-arc shots to find the fastest path.
-        // Low-arc right: small angle (e.g. 20). High-arc right: large angle (e.g. 70).
-        // Low-arc left: large angle (e.g. 160). High-arc left: small angle (e.g. 110).
-        const startAngle = shootingLeft ? 160 : 20;
-        const endAngle = shootingLeft ? 110 : 70;
-        const step = shootingLeft ? -angleStep : angleStep;
-
-        for (let angle = startAngle; shootingLeft ? angle >= endAngle : angle <= endAngle; angle += step) {
-            // Binary search for power
-            let lowPower = 10;
-            let highPower = 100;
-            let bestPowerForAngle = -1;
-
-            for (let j = 0; j < 10; j++) { // 10 iterations for binary search is enough
-                const midPower = (lowPower + highPower) / 2;
-                if(midPower > 99.5 || midPower < 10.5) break;
-
-                const result = this.simulateShot(angle, midPower, wind);
-
-                if (result.hit === 'opponent') {
-                    bestPowerForAngle = midPower;
-                    break; // Found a direct hit
+    // Returns true on the frame the CPU pulls the trigger.
+    update(dt) {
+        const t = this.tank;
+        switch (this.phase) {
+            case 'think': {
+                this.timer -= dt;
+                // Evaluate one elevation per frame to spread the work out.
+                if (this.candidates.length) {
+                    this.evaluate(this.candidates.shift());
+                } else if (this.timer <= 0) {
+                    this.beginAdjust();
                 }
-
-                const fellShort = shootingLeft ? (result.x > targetX) : (result.x < targetX);
-
-                if (result.hit === 'terrain') {
-                    if (fellShort) {
-                        lowPower = midPower;
-                    } else {
-                        highPower = midPower;
-                    }
-                } else { // out_of_bounds or timeout
-                    highPower = midPower; // likely overshot
+                return false;
+            }
+            case 'adjust': {
+                this.timer += dt;
+                const k = Math.min(1, this.timer / this.duration);
+                const e = k * k * (3 - 2 * k);
+                t.angle = this.fromAngle + (this.toAngle - this.fromAngle) * e;
+                t.setPower(this.fromPower + (this.toPower - this.fromPower) * e);
+                if (k >= 1) {
+                    this.phase = 'hold';
+                    this.timer = randRange(0.2, 0.4);
                 }
+                return false;
             }
-
-            let power;
-            if (bestPowerForAngle !== -1) {
-                power = bestPowerForAngle;
-            } else {
-                // if no direct hit was found, lets check the best power we found
-                const lowResult = this.simulateShot(angle, lowPower, wind);
-                const highResult = this.simulateShot(angle, highPower, wind);
-
-                const lowDist = Math.abs(lowResult.x - targetX);
-                const highDist = Math.abs(highResult.x - targetX);
-
-                power = lowDist < highDist ? lowPower : highPower;
-            }
-
-            const result = this.simulateShot(angle, power, wind);
-            const dist = Math.sqrt(Math.pow(result.x - targetX, 2) + Math.pow(result.y - targetY, 2));
-            if (dist < minDistance) {
-                minDistance = dist;
-                bestShot = { angle: angle, power: power, dist: dist };
-            }
+            case 'hold':
+                this.timer -= dt;
+                if (this.timer <= 0) {
+                    this.phase = 'idle';
+                    // It "gets a feel" for the range and the wind as the fight goes on.
+                    this.errScale = Math.max(this.skill.floor, this.errScale * this.skill.learn);
+                    this.windKnow += (1 - this.windKnow) * 0.3;
+                    return true;
+                }
+                return false;
+            default:
+                return false;
         }
-
-        if (bestShot) {
-            // Add controlled inaccuracy based on difficulty
-            const angleError = (Math.random() - 0.5) * this.errorRange;
-            const powerError = (Math.random() - 0.5) * this.errorRange * 0.5; // less error on power
-            bestShot.angle += angleError;
-            bestShot.power += powerError;
-
-            // Clamp values
-            bestShot.angle = Math.max(0, Math.min(180, bestShot.angle));
-            bestShot.power = Math.max(10, Math.min(100, bestShot.power));
-
-            return {
-                angle: Math.round(bestShot.angle),
-                power: Math.round(bestShot.power)
-            };
-        }
-
-        // Fallback to a random shot if no solution found (should be rare)
-        console.error("Bot could not find a solution. Firing a random shot.");
-        return {
-            angle: Math.random() * 180,
-            power: Math.random() * 50 + 20
-        };
     }
-    
-    async makeMove(wind) {
-        // Calculate optimal shot
-        const shot = this.calculateOptimalShot(wind);
-        
-        console.log('Bot position:', this.tank.x, this.tank.y);
-        console.log('Opponent position:', this.opponent.x, this.opponent.y);
-        console.log('Distance:', Math.sqrt(Math.pow(this.opponent.x - this.tank.x, 2) + Math.pow(this.opponent.y - this.tank.y, 2)));
-        console.log('Bot target shot:', shot);
-        console.log('Bot current angle/power:', this.tank.angle, this.tank.power);
-        
-        // Simulate thinking time
-        await this.delay(this.thinkingTime);
-        
-        // Make sure we're actually changing values
-        if (Math.abs(shot.angle - this.tank.angle) < 1 && Math.abs(shot.power - this.tank.power) < 1) {
-            console.log('Bot values too close, forcing adjustment');
-            // Force some change if we're too close to starting values
-            shot.angle = this.tank.angle + (Math.random() - 0.5) * 40;
-            shot.power = this.tank.power + (Math.random() - 0.5) * 30;
-            shot.angle = Math.max(0, Math.min(180, shot.angle));
-            shot.power = Math.max(10, Math.min(100, shot.power));
+
+    beginAdjust() {
+        const t = this.tank;
+        let angle;
+        let power;
+        if (this.best) {
+            angle = this.best.angle;
+            power = this.best.power;
+        } else {
+            angle = t.side === 0 ? 60 : 120;
+            power = randRange(40, 80);
         }
-        
-        // Gradually adjust to target values for realistic movement
-        const steps = 20;
-        const angleStep = (shot.angle - this.tank.angle) / steps;
-        const powerStep = (shot.power - this.tank.power) / steps;
-        
-        for (let i = 0; i < steps; i++) {
-            this.tank.adjustAngle(angleStep);
-            this.tank.adjustPower(powerStep);
-            if (this.game) {
-                this.game.updateUI();
-            }
-            await this.delay(50);
-        }
-        
-        // Final adjustment to exact values
-        const finalAngleAdjust = shot.angle - this.tank.angle;
-        const finalPowerAdjust = shot.power - this.tank.power;
-        
-        if (Math.abs(finalAngleAdjust) > 0.1) {
-            this.tank.angle = shot.angle;
-        }
-        if (Math.abs(finalPowerAdjust) > 0.1) {
-            this.tank.power = shot.power;
-        }
-        
-        if (this.game) {
-            this.game.updateUI();
-        }
-        
-        console.log('Bot final angle/power:', this.tank.angle, this.tank.power);
-        
-        // Small delay before firing
-        await this.delay(300);
-        
-        return this.tank.fire();
+        angle += gaussian() * this.skill.angleErr * this.errScale;
+        power += gaussian() * this.skill.powerErr * this.errScale;
+        this.fromAngle = t.angle;
+        this.fromPower = t.power;
+        this.toAngle = clamp(angle, 2, 178);
+        this.toPower = clamp(power, 10, 100);
+        const swing = Math.abs(this.toAngle - this.fromAngle) / 60 + Math.abs(this.toPower - this.fromPower) / 60;
+        this.duration = clamp(0.7 + swing * 0.6, 0.8, 1.5);
+        this.timer = 0;
+        this.phase = 'adjust';
     }
-    
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+
+    evaluate(elevation) {
+        const t = this.tank;
+        const target = this.world.target;
+        const dir = Math.sign(target.x - t.x) || 1;
+        const angle = dir > 0 ? elevation : 180 - elevation;
+        const wind = this.world.wind * this.windKnow;
+        let lo = 10;
+        let hi = 100;
+        let bestLocal = null;
+        for (let i = 0; i < 13; i++) {
+            const power = (lo + hi) / 2;
+            const r = this.simulate(angle, power, wind);
+            const err = Math.hypot(r.x - target.cx, (r.y - target.cy) * 0.5);
+            if (!bestLocal || err < bestLocal.err) bestLocal = { angle, power, err, x: r.x, y: r.y };
+            if (r.type === 'tank' && r.tank === target) break;
+            let signed;
+            if (r.type === 'out' || r.type === 'timeout') signed = (r.x - t.x) * dir > 0 ? 1 : -1;
+            else signed = (r.x - target.cx) * dir;
+            if (signed < 0) lo = power;
+            else hi = power;
+        }
+        // Don't pick shots that blow up in our own face.
+        const selfDist = Math.hypot(bestLocal.x - t.cx, bestLocal.y - t.cy);
+        const radius = WEAPONS[t.weapon].radius;
+        let score = bestLocal.err + Math.abs(elevation - 50) * 0.3;
+        if (selfDist < radius + 30) score += 1000;
+        if (!this.best || score < this.best.score) this.best = { ...bestLocal, score };
+    }
+
+    simulate(angle, power, wind) {
+        const t = this.tank;
+        const tip = t.barrelTip(angle);
+        const v = launchVelocity(angle, power);
+        const body = { x: tip.x, y: tip.y, vx: v.vx, vy: v.vy, age: 0, owner: t };
+        const { terrain, tanks } = this.world;
+        for (let i = 0; i < SIM_MAX_STEPS; i++) {
+            integrate(body, SIM_DT, wind);
+            body.age += SIM_DT;
+            const hit = checkImpact(body, terrain, tanks);
+            if (hit) return hit;
+        }
+        return { type: 'timeout', x: body.x, y: body.y };
     }
 }

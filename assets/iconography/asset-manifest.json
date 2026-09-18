@@ -1,0 +1,601 @@
+{
+  "name": "AM Arcade iconography",
+  "version": 1,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5952,
+      "sha256": "4d72036d907ff8d6fe81f768f77914e2bea9e52152f28181e954b070118b6556"
+    },
+    {
+      "path": "artwork/am-arcade-256.png",
+      "bytes": 67230,
+      "sha256": "9ac8f82cf04dbec0dc7397564333cf55d36b80d4d1aa45ef3cd1df75a45c82c7"
+    },
+    {
+      "path": "artwork/am-arcade-256.webp",
+      "bytes": 15090,
+      "sha256": "dfe3d04558f6d51775e5f7fea91e3fb384ec17415d2e6f353face9e03c412d22"
+    },
+    {
+      "path": "artwork/am-arcade-512.png",
+      "bytes": 232013,
+      "sha256": "5f43ceb88a03c6b11ac9f1ebc810039cc8daf9aa935205e35eb46c15797d93a8"
+    },
+    {
+      "path": "artwork/am-arcade-512.webp",
+      "bytes": 38154,
+      "sha256": "8aee26a9c638502eee4b9d690eb5b1ae8aab8403f1cb2c2996e39364d7019477"
+    },
+    {
+      "path": "artwork/am-arcade-master.png",
+      "bytes": 1492024,
+      "sha256": "829895efcb03e5b77a147d17f68e4cc87ea541dce294444a27b38fcaab40994e"
+    },
+    {
+      "path": "artwork/brick-blitz-256.png",
+      "bytes": 63973,
+      "sha256": "da291732df47420bd90b03f38ed32ff7c707145d3894f6451b8c0227fa861212"
+    },
+    {
+      "path": "artwork/brick-blitz-256.webp",
+      "bytes": 16018,
+      "sha256": "1156eef4c0c7f6f18aa8cf59c06f8916ab6739a5efbe11cc712265350e02440e"
+    },
+    {
+      "path": "artwork/brick-blitz-512.png",
+      "bytes": 211529,
+      "sha256": "d0fe35718619a50df03f82977b720c511ce6883405958050f9aae13483512578"
+    },
+    {
+      "path": "artwork/brick-blitz-512.webp",
+      "bytes": 42746,
+      "sha256": "fb40983a87069325bdde29dffd4575487d8e8ee26e8571f0c3848344612d5b32"
+    },
+    {
+      "path": "artwork/brick-blitz-master.png",
+      "bytes": 1196597,
+      "sha256": "18aa6b8e4704f1638df9bb0890bb378d22b4601e89c5e7527ce3d7ff8fa8e9d8"
+    },
+    {
+      "path": "artwork/neon-racer-256.png",
+      "bytes": 73068,
+      "sha256": "3e73ea09f1a5f51429e1283ef0d1a1afbdb07f5466faf697d67cb30e892fd61c"
+    },
+    {
+      "path": "artwork/neon-racer-256.webp",
+      "bytes": 18108,
+      "sha256": "2475e46f9a973502717c127391255c9679a31ad53cccd0344264e18051b5e751"
+    },
+    {
+      "path": "artwork/neon-racer-512.png",
+      "bytes": 240054,
+      "sha256": "6863b1c551f77765616cab2dec26efba69b5532f321b078fa9eaa252f1f57434"
+    },
+    {
+      "path": "artwork/neon-racer-512.webp",
+      "bytes": 49542,
+      "sha256": "1752d6af5266cb93c300809f48bf4e8a5b37b1831c63e9973368fc17c6951f11"
+    },
+    {
+      "path": "artwork/neon-racer-master.png",
+      "bytes": 1311096,
+      "sha256": "23a85f088e69a0b0d64dd410d6be712d9fa2119f963ac85ef2ec61ed59c7f0b6"
+    },
+    {
+      "path": "artwork/neon-snake-256.png",
+      "bytes": 68351,
+      "sha256": "2ff4393e4480d3bb7840c4ec8c5eaa63c61a2788a45e6d9ef45502c50602c338"
+    },
+    {
+      "path": "artwork/neon-snake-256.webp",
+      "bytes": 16748,
+      "sha256": "cd659606fddef31f278dca755a1dfbf1fc36ab84f19c6c07ef0bb8cde2148655"
+    },
+    {
+      "path": "artwork/neon-snake-512.png",
+      "bytes": 223971,
+      "sha256": "f3cf9dd45db5ba80d46312ce4153d76c5f05c8da7f33aa872f020a3c78a60a50"
+    },
+    {
+      "path": "artwork/neon-snake-512.webp",
+      "bytes": 46720,
+      "sha256": "dba451caa99deb7f479cd3640015e6875f4c7c5a4abaf16104adc1a2fa69e37b"
+    },
+    {
+      "path": "artwork/neon-snake-master.png",
+      "bytes": 1218267,
+      "sha256": "f6ec1a88e60093cc187564b2c3f9ba5ee49fa8d3ca1456bee8d67a877db2333f"
+    },
+    {
+      "path": "artwork/star-swarm-256.png",
+      "bytes": 76944,
+      "sha256": "5827e0311d2ede1c9de2a434dc0c0f3d844a7fe9e8e146f9d0bd8cc1c08ca113"
+    },
+    {
+      "path": "artwork/star-swarm-256.webp",
+      "bytes": 17364,
+      "sha256": "4ed0dc2e10668d0ef6a9c086e50146d2458801622576ea8bd734610d046711c2"
+    },
+    {
+      "path": "artwork/star-swarm-512.png",
+      "bytes": 248524,
+      "sha256": "bd04731114d3fcc33ccbf990bab82233a5799d1da5c7fab6808acf55677d46d0"
+    },
+    {
+      "path": "artwork/star-swarm-512.webp",
+      "bytes": 46872,
+      "sha256": "83c15e15797380be3a4eee28b1c311cf1016e270e336d02505c41d44538ebef6"
+    },
+    {
+      "path": "artwork/star-swarm-master.png",
+      "bytes": 1388482,
+      "sha256": "cac2f131cc3b6795dfed8beee6314b833a00524eb03273b5feafb8c2b838d6bf"
+    },
+    {
+      "path": "artwork/tank-artillery-256.png",
+      "bytes": 82845,
+      "sha256": "481602b595bb68159d8f83ecfaa8408f36f20a867fcae1d6ae5379956e7528f8"
+    },
+    {
+      "path": "artwork/tank-artillery-256.webp",
+      "bytes": 17724,
+      "sha256": "af00d04d712f473a27ade432704a35062459d99973267690ed72af5a30583fda"
+    },
+    {
+      "path": "artwork/tank-artillery-512.png",
+      "bytes": 275905,
+      "sha256": "a04823ca58d7f202980c2d0fd6550455f31f6dedc70b940195cac9cbf6f4230e"
+    },
+    {
+      "path": "artwork/tank-artillery-512.webp",
+      "bytes": 50912,
+      "sha256": "200175644dd71e68d679ca3641d38eceaea0d239b206f8abc59d349a5a77a122"
+    },
+    {
+      "path": "artwork/tank-artillery-master.png",
+      "bytes": 1564618,
+      "sha256": "ddf87db371f0c93a4388e695c40cc7641a22ed38ada16c45c01692a2150bff68"
+    },
+    {
+      "path": "brand/app-icon-1024.png",
+      "bytes": 38438,
+      "sha256": "47949fe45a1f52df70b1a3091d705ef692e2cf870d90fcd50809ba9b64bb9598"
+    },
+    {
+      "path": "brand/app-icon-192.png",
+      "bytes": 5688,
+      "sha256": "ce1cf4babcade491e87e15f91b1e0ef9e44fb62121d0d6a679e167af4f6e1de0"
+    },
+    {
+      "path": "brand/app-icon-512.png",
+      "bytes": 17140,
+      "sha256": "1416d30a4ce6092186a279c34e288512f1bd4fe2be03c0d0b990074412af9ab1"
+    },
+    {
+      "path": "brand/app-icon-maskable-512.png",
+      "bytes": 9341,
+      "sha256": "2aa43075be495edbe84b0137491e67ced39394f85d2b9a2345b13a58574f5f30"
+    },
+    {
+      "path": "brand/app-icon-maskable.svg",
+      "bytes": 280,
+      "sha256": "f3661dec503ef5bf5710dd3bec423fd446b1f6dc08f0db222e0f2ebfae15416d"
+    },
+    {
+      "path": "brand/app-icon.svg",
+      "bytes": 243,
+      "sha256": "ad1a7ac31a54050ce02ec62dd1e6f22a582825a96c3a75eff037a145cddf3043"
+    },
+    {
+      "path": "brand/mark-mono.svg",
+      "bytes": 199,
+      "sha256": "367c5b6bc2d57a184fbb939399b9c48e53e5062a7f42d90f768fb2e307014bda"
+    },
+    {
+      "path": "brand/mark.svg",
+      "bytes": 189,
+      "sha256": "cfc2c589733e032973cb248a9db48187a06228a50d0a6fa0a15c75cf146b4e00"
+    },
+    {
+      "path": "brand/wordmark-dark.svg",
+      "bytes": 1344,
+      "sha256": "6e56ec140212f5986dfce2d32f2de1e15b77b4808a4e30384846add7090a7d2d"
+    },
+    {
+      "path": "brand/wordmark-light.svg",
+      "bytes": 1344,
+      "sha256": "14575e6c2663ac8b2e62d614b03feeab3547a1bdc3284ea1ef8e0fcebdd5ebf1"
+    },
+    {
+      "path": "brand/wordmark-mono.svg",
+      "bytes": 1394,
+      "sha256": "90963424145587ee09d3807e4a1c1e6c1b4fa98f28ef0c521e5b87c71d3d6348"
+    },
+    {
+      "path": "favicon/apple-touch-icon.png",
+      "bytes": 3736,
+      "sha256": "0629673119402559cca4cd2805edaf490d74d1d95257b856ca033b43e0b2228e"
+    },
+    {
+      "path": "favicon/favicon-16.png",
+      "bytes": 513,
+      "sha256": "2703b16b504fcd86dbfbdc19a6e92f0ced6b96c88015e4dc97f81783edb905b6"
+    },
+    {
+      "path": "favicon/favicon-32.png",
+      "bytes": 984,
+      "sha256": "f5995e2b17759e11aedb239525c6d8dcd3aaa3bc717b7e20163709d4b3150556"
+    },
+    {
+      "path": "favicon/favicon-48.png",
+      "bytes": 1467,
+      "sha256": "90850361eb8c10d9a8b6561fdf0219bb993e6684c3dc27ba311accb0654285dc"
+    },
+    {
+      "path": "favicon/favicon.ico",
+      "bytes": 15086,
+      "sha256": "45ee9a189b027e693cdb8d609db6eebe4bb9d625d73ab9fb157b0aaa74b22fce"
+    },
+    {
+      "path": "favicon/favicon.svg",
+      "bytes": 243,
+      "sha256": "ad1a7ac31a54050ce02ec62dd1e6f22a582825a96c3a75eff037a145cddf3043"
+    },
+    {
+      "path": "favicon/safari-pinned-tab.svg",
+      "bytes": 145,
+      "sha256": "04e51223323235d1e2c3bf8f7d924e053dfd9c1251145e8065f7234702ba4481"
+    },
+    {
+      "path": "games/brick-blitz-badge-256.png",
+      "bytes": 3704,
+      "sha256": "f4d38da8cdee32c332512a550dd057debc39f8be5aa1498ebb6076d2ac82487a"
+    },
+    {
+      "path": "games/brick-blitz-badge.svg",
+      "bytes": 493,
+      "sha256": "53be3d8e28e1c5602653db1756ecb72b143c6b0daf5bba6549ca16f3f75148f0"
+    },
+    {
+      "path": "games/brick-blitz-glyph.svg",
+      "bytes": 271,
+      "sha256": "770d36daefd6635ec690f14d3e7310c6c1b8066c75b1e557d279bce49f1ef303"
+    },
+    {
+      "path": "games/neon-racer-badge-256.png",
+      "bytes": 4550,
+      "sha256": "272e30b26a46c2e8f4b99d3a8edea5b92a35e87867c8242f148c34c8fbe4135d"
+    },
+    {
+      "path": "games/neon-racer-badge.svg",
+      "bytes": 455,
+      "sha256": "ea9420ecc7e9c1858dce39916d92f52c0d216050050896ba2735721a410601bf"
+    },
+    {
+      "path": "games/neon-racer-glyph.svg",
+      "bytes": 233,
+      "sha256": "502c5c3af83167e0ba36d5f76be82fd5178bdc66810f33470d6a65a972d9b394"
+    },
+    {
+      "path": "games/neon-snake-badge-256.png",
+      "bytes": 4605,
+      "sha256": "0e54ff06740dfd2ec6b256a6987cf05b0702d88f6151c1451dbfeea4662605ab"
+    },
+    {
+      "path": "games/neon-snake-badge.svg",
+      "bytes": 484,
+      "sha256": "59be0c9aa17b107adf657d55c4f4fe1c57876097b06fc827e13843fdca178474"
+    },
+    {
+      "path": "games/neon-snake-glyph.svg",
+      "bytes": 262,
+      "sha256": "a7c6aca4042731ed49e20d5063a7d96fd97b2b40a198bb63893aa10a5766685c"
+    },
+    {
+      "path": "games/star-swarm-badge-256.png",
+      "bytes": 5296,
+      "sha256": "64d900747191fa344d5db77608494ff7cac3321fd17f14a64eb3b632d73d8ba3"
+    },
+    {
+      "path": "games/star-swarm-badge.svg",
+      "bytes": 472,
+      "sha256": "e63806fb7cbe911dae0366049d1fb7ead34d3e25b08e09268ebd4e63fe53963c"
+    },
+    {
+      "path": "games/star-swarm-glyph.svg",
+      "bytes": 250,
+      "sha256": "4f5a7fdc8eea1fdc6a9bdd0439ab434fcc927e7791e1236333a97ade64e03697"
+    },
+    {
+      "path": "games/tank-artillery-badge-256.png",
+      "bytes": 4547,
+      "sha256": "c7ed5972fd29561a344fb51f6e498eca62c53e33db0bc35585ce27ab01d54f51"
+    },
+    {
+      "path": "games/tank-artillery-badge.svg",
+      "bytes": 470,
+      "sha256": "645a800bdb7871b2f1df2e0c5d298c5a81d52722cc81ae32b73146355f08d674"
+    },
+    {
+      "path": "games/tank-artillery-glyph.svg",
+      "bytes": 248,
+      "sha256": "de6ad4227d4279a0774f99c4041aa7d608a4d4462aabbade881f1daf9d02a624"
+    },
+    {
+      "path": "index.html",
+      "bytes": 23161,
+      "sha256": "16c7d4721068cde74523a264d9f348d27db0599e4f6dc9baa2cac1e1aeed0fc2"
+    },
+    {
+      "path": "manifest.example.webmanifest",
+      "bytes": 494,
+      "sha256": "a4607a7580154eccd92fa01a7a6a1f3aedc31948e894d401e4b9998aad3e80ed"
+    },
+    {
+      "path": "preview/collection.png",
+      "bytes": 488905,
+      "sha256": "07a42e932def644b4c0f8201499632e38afcc3a24f22942c99e1b27a42d631f8"
+    },
+    {
+      "path": "preview/light-ui.png",
+      "bytes": 490230,
+      "sha256": "a15daff822104c21428a81113f69bfdf1ab626b2be7ee72fa2a1088b03443a6d"
+    },
+    {
+      "path": "preview/mobile.png",
+      "bytes": 383855,
+      "sha256": "db2258d2473c8b40c9de365db219ca0e685355004252bca6a4550f2d0486d789"
+    },
+    {
+      "path": "preview/verification.json",
+      "bytes": 210,
+      "sha256": "3bde76327a34423b5a6642c670990c9b938603731589c6b3eaddef08b60c829b"
+    },
+    {
+      "path": "source/build.py",
+      "bytes": 7744,
+      "sha256": "2d2ed9801ac2dcabbda3f58c6f57df0a0f9ece8aa3dd825ce7ec35096d1870a6"
+    },
+    {
+      "path": "source/catalog.json",
+      "bytes": 750,
+      "sha256": "5d2d69855232f6a946347c86892944f878101c1bdf11c7e67e1768ed321dd57e"
+    },
+    {
+      "path": "source/export.sh",
+      "bytes": 943,
+      "sha256": "990c4a07dfe1510207d6f9b05d10174182706cb6e2e32b7ba5f0cd6c2d844efe"
+    },
+    {
+      "path": "source/package.py",
+      "bytes": 1169,
+      "sha256": "1587e583a18a780977caf3ae531245f8860dcf1f4c9c713a455e4456d73fb62c"
+    },
+    {
+      "path": "source/preview.py",
+      "bytes": 9009,
+      "sha256": "0e98d67d2761d5a85a15d55a403fbc1af09d6df0bc720414dac606e71f6d89a6"
+    },
+    {
+      "path": "source/prompts.json",
+      "bytes": 7730,
+      "sha256": "977017f9a193734c068f291ecbc6e861fbdb7d326f1fa6699e2190ae464466da"
+    },
+    {
+      "path": "source/verify.mjs",
+      "bytes": 2574,
+      "sha256": "1763202526dfc2f0cff174d8733d0be620edd509e3812536aa114e7dabdcb48e"
+    },
+    {
+      "path": "tokens.css",
+      "bytes": 267,
+      "sha256": "b95ec46f944e5953999a46eb48d83abd947a56a80e7a091d8a2a22a41d256a1d"
+    },
+    {
+      "path": "ui/arrow-down.svg",
+      "bytes": 208,
+      "sha256": "b93948f95aae2b1ed49fc0d7cfa71793ebc908fd01022e0c19075323c177e3c3"
+    },
+    {
+      "path": "ui/arrow-left.svg",
+      "bytes": 208,
+      "sha256": "f30d6aa58552894df3681add01d37aae86686d0e3f21fffb6a0804d2be18d885"
+    },
+    {
+      "path": "ui/arrow-right.svg",
+      "bytes": 208,
+      "sha256": "64d5f135e7181ea8a0acd2b63b3a300c83efece1989f766255f0690ae80865ff"
+    },
+    {
+      "path": "ui/arrow-up.svg",
+      "bytes": 208,
+      "sha256": "035fad349aef35cbfaf9e9e4cb3ef20d30b6ed457176b72e9c889a1f88336700"
+    },
+    {
+      "path": "ui/bolt.svg",
+      "bytes": 213,
+      "sha256": "74ef9536c1e447f7f4b8411f27ed5f038770363602f8d5108ae8b855be1ccdc0"
+    },
+    {
+      "path": "ui/cabinet.svg",
+      "bytes": 253,
+      "sha256": "9bda76e8b7f702d1cd539143b0ccb1d463347b96e4a6d57a2a6c3e4b8d7dcd80"
+    },
+    {
+      "path": "ui/check.svg",
+      "bytes": 201,
+      "sha256": "4b5567841823fd7f6c29ae330188844a6c0e8949b0965e803950e96f169fcc5d"
+    },
+    {
+      "path": "ui/close.svg",
+      "bytes": 207,
+      "sha256": "9df2a4deade6249fa66602d39171a3114de7bdccdaf819d8add62dc5a98179c2"
+    },
+    {
+      "path": "ui/coin.svg",
+      "bytes": 236,
+      "sha256": "591dc19dcfe89f1e33df7cdacdce768a3436f3902dce27730fb72dda55765d73"
+    },
+    {
+      "path": "ui/exit.svg",
+      "bytes": 220,
+      "sha256": "9e1d532bd599fd2cfeb87e5e8477281689083eaecb54b823c93a3dcf722df8a5"
+    },
+    {
+      "path": "ui/fullscreen.svg",
+      "bytes": 223,
+      "sha256": "81a1d2523557183292fd2e2482688cba6ae3237105e1582f4dd0708e3e508b56"
+    },
+    {
+      "path": "ui/gem.svg",
+      "bytes": 233,
+      "sha256": "aca5b53bdd79ac5c3a6b140292bb53f147492b674ab73bca22164c74f717c494"
+    },
+    {
+      "path": "ui/heart.svg",
+      "bytes": 247,
+      "sha256": "3eb6f11116d23fc16765c839a821e46497844c9e0e686a23f5e8deded96713c8"
+    },
+    {
+      "path": "ui/home.svg",
+      "bytes": 220,
+      "sha256": "ed4b8a972baa5ec9a47b04a9bad55aad2073b95cd1338cebf54555f00959e6f7"
+    },
+    {
+      "path": "ui/info.svg",
+      "bytes": 234,
+      "sha256": "edd60b6a01d7e5c0acf6b59ae1b2d19ad6ecdab0ad7320d296073134663cd808"
+    },
+    {
+      "path": "ui/interact.svg",
+      "bytes": 259,
+      "sha256": "aa0c8fba874443884e2b521d70fd846b13ff556c59c35718c030de741f509359"
+    },
+    {
+      "path": "ui/joystick.svg",
+      "bytes": 277,
+      "sha256": "73b42dca7a406a70fffbf4beb9027bfe0f286f2f26e0c538f855273fdbf5c770"
+    },
+    {
+      "path": "ui/keyboard.svg",
+      "bytes": 310,
+      "sha256": "bb5346a446801ae949b5ebbd65b6ff9c60aceb1182acdd05c49996d452f727a6"
+    },
+    {
+      "path": "ui/leaderboard.svg",
+      "bytes": 240,
+      "sha256": "dc0427facbbec69676f26ff90da8a0693bd3de00566ab3ede9cd225962e4a157"
+    },
+    {
+      "path": "ui/lock.svg",
+      "bytes": 267,
+      "sha256": "73b4b5256a37043b86cc81c9aad3bd2cfc8641ad88d6a6cef3470e3b7805900c"
+    },
+    {
+      "path": "ui/look.svg",
+      "bytes": 262,
+      "sha256": "7539e389fab71df6aed836f7aeb924acdf8dc28e58e4803abd08e5a31e0b3cc3"
+    },
+    {
+      "path": "ui/medal.svg",
+      "bytes": 258,
+      "sha256": "f45b641f7eb116cb23cee8bbc55645c09840d6a92a821970d472b8ce5972356c"
+    },
+    {
+      "path": "ui/menu.svg",
+      "bytes": 210,
+      "sha256": "d8cee9ea70f0715e3fe270ea265f5c32eddce9263617b90776bd37985e6f7eab"
+    },
+    {
+      "path": "ui/mouse.svg",
+      "bytes": 251,
+      "sha256": "e955308fc6f74288e8fc7be6f47ec183a0c4e494610288af9aa61394bf73913f"
+    },
+    {
+      "path": "ui/move.svg",
+      "bytes": 257,
+      "sha256": "bdb83571ce29d5be413dcca261a412060e86ad683dd93a643152fba8510d9de4"
+    },
+    {
+      "path": "ui/music.svg",
+      "bytes": 290,
+      "sha256": "6f53c740ce604eb52e8912538138961175157f7378803672acdaa31245c317a9"
+    },
+    {
+      "path": "ui/pause.svg",
+      "bytes": 213,
+      "sha256": "5f3a0edd320f1874c5f1cd3b29bcf34d4c4ebe299dc04cce8d5072db535e8608"
+    },
+    {
+      "path": "ui/play.svg",
+      "bytes": 202,
+      "sha256": "38eefb8f4171f7e8c2b4d8cb2125e7a701d2619b0bc84e96cf21bc64d346dd8f"
+    },
+    {
+      "path": "ui/players.svg",
+      "bytes": 280,
+      "sha256": "db3446d31a498f3b8ebb2f8228ce0a6b8464f4258c52ffff1fce0c4f104665e1"
+    },
+    {
+      "path": "ui/restart.svg",
+      "bytes": 216,
+      "sha256": "cf7fd820cd536bd1957df6fd878622292e735cd0d0eb0ddae3687d76dadfda9c"
+    },
+    {
+      "path": "ui/resume.svg",
+      "bytes": 210,
+      "sha256": "d1c21dc1aed40e13d9c3f55ff2a0cb7349610ead0051f17a53b0c79b4e445dea"
+    },
+    {
+      "path": "ui/run.svg",
+      "bytes": 261,
+      "sha256": "5c46a3ccf3d7f3d1335ee54942fdb2e6e22b0b3e205a8f7be9d9d89d4d673559"
+    },
+    {
+      "path": "ui/settings.svg",
+      "bytes": 246,
+      "sha256": "0886f2eeaf79696ccc99a5ce08b6319d9ae7ccbfb1a36b20b3a41d5209f8b35f"
+    },
+    {
+      "path": "ui/shield.svg",
+      "bytes": 238,
+      "sha256": "cdc39ac447b511e29d03d567aed0b953608334eef24823c8be258196891b1c22"
+    },
+    {
+      "path": "ui/sprite.svg",
+      "bytes": 8992,
+      "sha256": "b1ab6cdc36dadf5a778182c4f6036d1d87c1fba7742bff108f29c036040c28e2"
+    },
+    {
+      "path": "ui/star.svg",
+      "bytes": 236,
+      "sha256": "387b9a1025a767d03d23c79a12ea889e7e83af5cec64203e81922a6eba86d144"
+    },
+    {
+      "path": "ui/target.svg",
+      "bytes": 277,
+      "sha256": "d49ae3787a99f819baf3c637e6d26e90d42b18fc69c6cfeafb3c033cfff57c31"
+    },
+    {
+      "path": "ui/timer.svg",
+      "bytes": 248,
+      "sha256": "d2e7f1d9ed8b0dd550f320bd577fb1ae079b18a2753af45502c60862d985920c"
+    },
+    {
+      "path": "ui/trophy.svg",
+      "bytes": 278,
+      "sha256": "53b4a8288e161337e293ccedbc5a599cbee83eb5752cbd818575e70adb5924ec"
+    },
+    {
+      "path": "ui/volume-off.svg",
+      "bytes": 225,
+      "sha256": "cc1d28d070d4abefefde2bea56401c07e0654e67072a18cc402d97330ea600ac"
+    },
+    {
+      "path": "ui/volume-on.svg",
+      "bytes": 249,
+      "sha256": "124af6796920ab002515bf8abbfba9e126144ee00c7397fae38b2272742afcb7"
+    }
+  ]
+}

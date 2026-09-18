@@ -1,0 +1,7 @@
+Posters to generate in this run (save paths are relative to the repository root):
+
+1. assets/generated/posters/brick-blitz.png
+   Subject: a chrome ball smashing through a wall of glowing green and violet bricks, shards and sparks flying toward the viewer, a pink-cyan paddle at the bottom, shattered bricks tumbling in dramatic perspective. Accent colour green #39ff14. Mood: destruction, satisfying impact.
+
+2. assets/generated/posters/neon-snake.png
+   Subject: a colossal amber-gold segmented mechanical snake coiling through a dark neon grid arena, head rearing toward the viewer with glowing eyes, its body winding away into the distance, small glowing fruit orbs scattered on the grid. Accent colour amber #ffb000. Mood: relentless growth, arcade menace.

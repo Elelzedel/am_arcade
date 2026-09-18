@@ -1,66 +1,72 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-module.exports = {
-  mode: 'development',
+// Every cabinet game also gets a standalone page at /<game>.html.
+const GAMES = ['tank-game', 'neon-racer', 'brick-blitz', 'star-swarm', 'neon-snake'];
+
+module.exports = (env, argv) => ({
+  mode: argv.mode || 'development',
   entry: {
-    arcadeEnvironment: './arcade-environment/src/index.js',
-    tankGame: './games/tank-game/src/index.js',
-    neonRacer: './games/neon-racer/src/index.js'
+    arcade: './arcade-environment/src/index.js',
+    ...Object.fromEntries(GAMES.map((game) => [game, `./games/${game}/src/standalone.js`])),
   },
   output: {
-    filename: '[name].bundle.js',
+    filename: '[name].[contenthash:8].js',
     path: path.resolve(__dirname, 'dist'),
-    clean: true
+    clean: true,
   },
-  devtool: 'inline-source-map',
+  devtool: argv.mode === 'production' ? false : 'eval-cheap-module-source-map',
   devServer: {
     static: './dist',
     hot: true,
     host: '0.0.0.0',
-    port: 8080
+    port: 8080,
+    // Reachable over the local network and the tailnet (webpack rejects
+    // unknown Host headers by default).
+    allowedHosts: ['localhost', '127.0.0.1', '.ts.net'],
+    client: {
+      overlay: false,
+      // Derive the live-reload socket from the page URL so it also works
+      // behind a reverse proxy (e.g. `tailscale serve` on https://<host>/).
+      webSocketURL: 'auto://0.0.0.0:0/ws',
+    },
+  },
+  performance: { hints: false },
+  optimization: {
+    splitChunks: { chunks: 'all' },
   },
   module: {
     rules: [
       {
-		  test: /\.gltf$/,
-		  loader: 'file-loader'
-	  },
+        test: /\.(gltf|glb|png|jpg|webp|ico|svg|webmanifest|woff2?)$/,
+        type: 'asset/resource',
+      },
       {
         test: /\.js$/,
         exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env']
-          }
-        }
+            presets: [['@babel/preset-env', { targets: 'defaults' }]],
+          },
+        },
       },
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader']
+        use: ['style-loader', 'css-loader'],
       },
-      {
-        test: /\.(glsl|vs|fs|vert|frag)$/,
-        type: 'asset/source'
-      }
-    ]
+    ],
   },
   plugins: [
     new HtmlWebpackPlugin({
       filename: 'index.html',
       template: './arcade-environment/index.html',
-      chunks: ['arcadeEnvironment']
+      chunks: ['arcade'],
     }),
-    new HtmlWebpackPlugin({
-      filename: 'tank-game.html',
-      template: './games/tank-game/index.html',
-      chunks: ['tankGame']
-    }),
-    new HtmlWebpackPlugin({
-      filename: 'neon-racer.html',
-      template: './games/neon-racer/index.html',
-      chunks: ['neonRacer']
-    })
-  ]
-};
+    ...GAMES.map((game) => new HtmlWebpackPlugin({
+      filename: `${game}.html`,
+      template: './games/shared/standalone.html',
+      chunks: [game],
+    })),
+  ],
+});

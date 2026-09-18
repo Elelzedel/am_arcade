@@ -1,0 +1,11 @@
+You are producing artwork for AM Arcade, a browser-based 3D retro arcade. Use your built-in image_gen tool (default mode; do not use the CLI fallback). Generate ONE image per poster listed below, one image_gen call each, then copy each final PNG into this repository at the exact path given. Do not modify any other files in the repository. Do not run git commands.
+
+Shared spec for every poster:
+- Use case: stylized-concept. Asset type: full-bleed vintage arcade promotional poster artwork, portrait orientation 2:3 (1024x1536).
+- Style/medium: 1980s-1990s arcade flyer painting reimagined as a premium modern render: airbrushed illustration with dramatic lighting, chrome and neon accents, cinematic depth, fine grain, subtle screen-print texture. Bold, readable central subject filling roughly 70 percent of the canvas.
+- Palette: deep midnight violet #090617 base, electric cyan #00e5ff, hot pink #ff2bd6, warm ivory #ffe066 highlights, plus the game accent colour named per poster.
+- Composition: leave the TOP 22 percent and the BOTTOM 12 percent of the canvas quieter (darker, less detailed) because the game title and a tagline will be overlaid there by code. Keep the hero subject in the middle band.
+- Constraints: absolutely NO text, letters, numbers, logos, watermarks or signatures anywhere in the image. No borders or frames. No cabinet or letter A emblem. Single coherent scene, no collage, no panels.
+- The attached images are STYLE and SUBJECT references only (they are the game emblems); match their material language (anodized violet metal, luminous coloured bevels, restrained neon) but paint a full scene, not an icon on a plain background.
+
+After generating, verify each output: no text, subject correct, portrait 2:3. If an image contains text, regenerate it once.

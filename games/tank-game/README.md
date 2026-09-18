@@ -1,166 +1,56 @@
-# Tank Artillery Game 🎯
+# Tank Artillery
 
-A modern, glass-morphism styled artillery game featuring multiple game modes, AI opponents, and destructible terrain. Inspired by classic tank games and Raft Wars, reimagined with Apple's liquid glass design language.
+Turn-based neon artillery in the spirit of Scorched Earth and Pocket Tanks.
+Aim, set your power, read the wind and blow craters in fully destructible
+terrain until the enemy tank is scrap.
 
-## 🎮 Game Modes
+## Modes
+Pick a mode on the title screen with LEFT / RIGHT:
 
-### 🤖 Single Player
-Challenge an AI opponent with four difficulty levels:
-- **🌱 Easy**: Forgiving AI with 60% accuracy
-- **⚔️ Medium**: Balanced challenge with 75% accuracy  
-- **🔥 Hard**: Tough opponent with 90% accuracy
-- **💀 Impossible**: Near-perfect AI with 98% accuracy
+- **1P VS CPU** is an arcade run against CPUs that get smarter every stage
+  (LV1 is sloppy and mostly ignores the wind; later CPUs adjust their aim fast).
+  Each stage uses a new random battlefield (hills, jagged peaks, valley, tower,
+  flatlands or bridge). Your armor carries over, with +35 repaired between
+  stages. When your tank is destroyed, the game is over.
+- **2 PLAYERS** is a hotseat duel: red and blue take turns on the same keys.
 
-### 🎮 Self Play
-Control both tanks for practice or fun with friends locally.
+## Controls
+| Key | Action |
+| --- | --- |
+| UP / DOWN (W / S) | Raise / lower the barrel (hold to speed up) |
+| LEFT / RIGHT (A / D) | Shot power (hold to speed up) |
+| SPACE | Fire |
+| Z / X | Drive left / right (uses the fuel gauge, refilled every turn) |
+| C or 1-3 | Change weapon |
+| P | Pause |
 
-### 🌐 Multiplayer (Coming Soon)
-Online battles against other players.
+Weapons: **SHELL** (unlimited), **TRIPLE** (3-shell spread, 2 per stage) and
+**MEGA BOMB** (huge blast, 1 per stage).
 
-## 🎮 How to Play
+Each turn has a 20 second timer. When it runs out, your tank fires with its
+current settings. The dotted guide only shows the start of the arc, and it
+ignores the wind.
 
-### Controls
-- **↑/↓ Arrow Keys**: Adjust firing angle
-- **←/→ Arrow Keys**: Adjust firing power
-- **SPACE**: Fire projectile
+## Scoring (1P)
+- 10 points per damage point dealt, +250 for a direct hit
+- Stage clear: 500 x stage, 10 per armor point left, a quick-kill bonus for
+  using fewer than 7 shots, and an accuracy bonus
 
-### Game Rules
-- Each player starts with 3 lives
-- Take turns firing at your opponent
-- Direct hits remove 1 life
-- Terrain is destructible - create craters with your shots
-- Wind affects projectile trajectory (changes each turn)
-- First player to eliminate opponent wins
+## Tips
+- Damage falls off with distance from the blast, so direct hits count most.
+- The wind gauge at the top shows direction and strength (0-10). Stronger wind
+  shows as orange.
+- If you blow the ground out from under a tank, it falls and takes fall damage.
+  Try shooting the bridge.
+- The tower is stone and hard to dig through. Lob over it, or shoot through
+  its window.
 
-## 🏗️ Architecture
-
-### Core Components
-
-#### `game.js`
-The main game controller that manages:
-- Game state (aiming, firing, game over)
-- Turn management
-- Input handling
-- Game loop and rendering coordination
-- UI updates
-
-#### `entities/tank.js`
-Tank class representing each player:
-- Position and rendering
-- Angle and power management (0-180° angle, 10-100% power)
-- Barrel visualization
-- Life tracking
-- Projectile creation
-
-#### `entities/projectile.js`
-Projectile physics and rendering:
-- Velocity-based movement
-- Gravity simulation (300 units/s²)
-- Wind effects
-- Trail visualization for trajectory
-- Collision detection
-
-#### `terrain.js`
-Destructible terrain system:
-- Procedural generation using sine waves
-- Height sampling at any x-coordinate
-- Crater creation on impact
-- Smooth terrain deformation
-- Multi-pass smoothing algorithm
-
-#### `renderer.js`
-Visual rendering utilities:
-- Sky gradient with cloud generation
-- Current player indicator
-- Visual effects and polish
-
-#### `utils/physics.js`
-Physics calculations:
-- Wind generation (-10 to +10 mph)
-- Trajectory calculations
-- Collision detection helpers
-
-## 🎨 Modern Design Updates
-
-### Visual Overhaul
-- **Dark Theme**: Deep purple/blue gradient backgrounds
-- **Glass Morphism**: All UI elements feature blur effects and transparency
-- **Animated Starfield**: Twinkling stars with dynamic brightness
-- **Aurora Effects**: Subtle atmospheric lighting
-- **Glowing Elements**: Tanks and projectiles emit soft light
-- **Modern Typography**: SF Pro Display inspired fonts
-
-### UI Components
-- **Main Menu**: Glass morphed buttons with hover animations
-- **Player Cards**: Floating side panels with health bars
-- **Wind Indicator**: Animated directional display
-- **Control Panel**: Sleek bottom bar with gradient sliders
-- **Victory Screen**: Smooth animations and multiple options
-
-### Visual Effects
-- **Glowing Projectiles**: White-hot projectiles with luminous trails
-- **Gradient Tanks**: Player-specific color schemes with glow
-- **Modern Terrain**: Purple-tinted landscape with edge glow
-- **Smooth Animations**: All UI transitions use easing functions
-
-## 🔧 Technical Details
-
-### AI Bot System
-- **Difficulty Levels**: Four distinct AI behaviors
-- **Smart Targeting**: Trigonometry-based angle calculations
-- **Adaptive Strategy**: Adjusts for distance, height, and wind
-- **Realistic Movement**: Gradual angle/power adjustments
-- **Visual Feedback**: See AI "thinking" before shots
-
-### Physics System
-- Projectile velocity: `power * 10` units/second
-- Gravity: 300 units/s² downward
-- Wind effect: `windSpeed * 2 * deltaTime` horizontal acceleration
-- Frame rate: 60 FPS target
-
-### Terrain Generation
-1. Generate base points using layered sine waves
-2. Add random variation for natural look
-3. Apply smoothing passes for realistic hills
-4. Update height map on crater impacts
-
-### Collision Detection
-- Tank hit radius: 40 units
-- Terrain collision: Pixel-perfect height checking
-- Boundary detection: Projectiles removed when leaving canvas
-
-## 🚀 Running the Game
-
-From the project root:
-```bash
-npm run dev
-```
-
-Navigate to `http://localhost:8080/tank-game.html`
-
-## 🎯 Recent Updates
-
-### Version 2.0 - Modern Redesign
-- ✅ Complete visual overhaul with glass morphism design
-- ✅ AI opponent with 4 difficulty levels
-- ✅ Main menu with game mode selection
-- ✅ Improved physics calculations
-- ✅ Responsive UI for arcade integration
-- ✅ Victory screen with replay options
-
-### Future Enhancements
-- Multiple weapon types
-- Power-ups and special abilities  
-- Network multiplayer implementation
-- More terrain types
-- Environmental hazards
-- Sound effects and music
-- Tournament mode
-
-## 🤝 Integration with AM Arcade
-
-This game is designed to run standalone for development but will be integrated as a texture/canvas element within the 3D arcade environment. The game maintains a consistent 1024x576 resolution for optimal arcade cabinet display.
-
----
-
-Built by ajclausen as part of the AM Arcade project.
+## Code
+- `src/game.js`: arcade flow, turns, input, HUD
+- `src/terrain.js`: 2px-cell destructible terrain with a cached render
+- `src/backdrop.js`: cached sky, sun and mountains
+- `src/effects.js`: explosions, smoke, popups, wind streaks
+- `src/entities/`: tank and projectile
+- `src/ai/bot.js`: frame-driven CPU that simulates shots and improves each stage
+- `src/utils/physics.js`: shared ballistics and weapon table
+- `src/music.js`: chiptune loop

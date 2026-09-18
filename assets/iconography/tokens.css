@@ -1,0 +1,10 @@
+:root {
+  --am-ink: #090617;
+  --am-panel: #161027;
+  --am-cyan: #00e5ff;
+  --am-pink: #ff2bd6;
+  --am-ivory: #ffe066;
+  --am-text: #f4efff;
+  --am-muted: #b4a8cc;
+}
+.am-icon { width: 1.5em; height: 1.5em; display: inline-block; flex: none; vertical-align: -.25em; }

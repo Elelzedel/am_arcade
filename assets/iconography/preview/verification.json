@@ -1,0 +1,12 @@
+{
+  "images": 17,
+  "broken": [],
+  "icons": 40,
+  "overflow": false,
+  "mobileOverflow": false,
+  "errors": [],
+  "filtering": "passed",
+  "themeToggle": "passed",
+  "desktop": "1440px",
+  "mobile": "390px"
+}

@@ -1,0 +1,10 @@
+Posters to generate in this run (save paths are relative to the repository root):
+
+1. assets/generated/posters/tank-artillery.png
+   Subject: a hot-pink and violet armored artillery tank on a cratered night battlefield, cannon elevated and firing an arcing glowing shell, parabolic tracer trail, distant mountain silhouettes, explosion light bloom. Accent colour hot pink #ff2bd6. Mood: heavy, explosive, triumphant.
+
+2. assets/generated/posters/neon-racer.png
+   Subject: a sleek cyan-violet spacecraft racing down an endless neon tunnel at extreme speed, motion-streaked light rings rushing past, engine exhaust trails in pink, tunnel vanishing to a bright point. Accent colour electric cyan #00e5ff. Mood: velocity, tunnel vision, adrenaline.
+
+3. assets/generated/posters/star-swarm.png
+   Subject: a red insectoid alien fighter leading a swarm of smaller crimson craft descending in formation from a starfield toward the viewer, laser bolts crossing the frame, a lone defender ship small at the bottom firing upward. Accent colour red #ff3b3b. Mood: invasion, last stand.
