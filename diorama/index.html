@@ -38,8 +38,6 @@
       }
       #loader.solid { background: var(--void); }
       #loader .card { position: absolute; top: 11vh; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 0; }
-      #loader.solid .card { top: 50%; transform: translateY(-60%); }
-      #loader .card { transition: top 1.2s var(--ease), transform 1.2s var(--ease); }
       #loader .eyebrow { font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; opacity: 0; animation: rise 1.2s 0.2s var(--ease) forwards; }
       #loader h1 {
         margin: 0; font-family: var(--neon); font-weight: 400; font-size: clamp(54px, 10vw, 150px); line-height: 0.9; letter-spacing: 0.02em;
@@ -191,8 +189,8 @@
         <div class="script">open 'til four</div>
         <div class="progress"><i></i></div>
         <div class="status">sweeping the floor&hellip;</div>
-        <button id="enter" class="hidden" inert>Step inside<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
       </div>
+      <button id="enter" class="hidden" inert>Step inside<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
       <div class="fine">best with sound &nbsp;·&nbsp; headphones on</div>
     </div>
 

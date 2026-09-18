@@ -21,6 +21,7 @@ import {
     createStringLights, createOpenSign, createAlley, createCouch,
 } from './props/streetProps.js';
 import { createCar } from './props/car.js';
+import { createFigureShelves } from './props/figures.js';
 import { createRain, createSteam } from './fx/weather.js';
 import { createPuddles } from './fx/puddles.js';
 import { batchStatic } from './batch.js';
@@ -69,11 +70,11 @@ const doorX = (ROOM.door[0] + ROOM.door[1]) / 2;
 const BACK = minZ + 0.44;
 const LEFT = minX + 0.44;
 const LAYOUT = [
-    { Game: TankGame, p: [-4.05, floor, BACK], r: 0 },
-    { Game: StarSwarm, p: [-3.15, floor, BACK], r: 0 },
-    { Game: NeonRacer, p: [-2.25, floor, BACK], r: 0 },
-    { Game: BrickBlitz, p: [LEFT, floor, -2.4], r: Math.PI / 2 },
-    { Game: NeonSnake, p: [LEFT, floor, -1.5], r: Math.PI / 2 },
+    { Game: TankGame, p: [-3.0, floor, BACK], r: 0 },
+    { Game: StarSwarm, p: [-2.1, floor, BACK], r: 0 },
+    { Game: NeonRacer, p: [-1.2, floor, BACK], r: 0 },
+    { Game: BrickBlitz, p: [LEFT, floor, -2.15], r: Math.PI / 2 },
+    { Game: NeonSnake, p: [LEFT, floor, -1.25], r: Math.PI / 2 },
 ];
 const cabinets = LAYOUT.map(({ Game, p, r }) => {
     const c = new Cabinet({ GameClass: Game, position: new THREE.Vector3(...p), rotationY: r });
@@ -92,14 +93,17 @@ const rocket = createRocketRide(scene, { position: [-0.7, floor, -0.7], rotation
 const couch = createCouch(scene, { position: [maxX - 0.45, floor, -0.9], rotationY: -Math.PI / 2 });
 const plants = [
     createSnakePlant(scene, { position: [maxX - 0.35, floor, maxZ - 0.35] }),
-    createSnakePlant(scene, { position: [-1.35, floor, minZ + 0.32], scale: 0.85 }),
+    createSnakePlant(scene, { position: [0.12, floor, minZ + 0.3], scale: 0.85 }),
     createSnakePlant(scene, { position: [minX + 0.32, floor, maxZ - 0.3], scale: 0.9 }),
 ];
-const clock = createClock(scene, { position: [-0.75, floor + 2.45, minZ], rotationY: 0 });
+const clock = createClock(scene, { position: [-0.18, floor + 2.5, minZ], rotationY: 0 });
 walls.back.attach(clock.root);
 const board = createScoreBoard(scene, { position: [minX, floor + 2.1, 0.85], rotationY: Math.PI / 2, cabinets });
 walls.left.attach(board.root);
-createWallSigns(walls, { coinAt: -3.15, gameOnAt: -1.95 });
+const wallSigns = createWallSigns(walls, { coinAt: -2.1, gameOnAt: -1.55 });
+// the collectibles in the back-left corner, where a machine used to hide
+const shelves = createFigureShelves(scene, { corner: [minX, minZ], backLength: 1.33, sideLength: 1.2 });
+shelves.root.position.y = floor;
 createPosters(walls.right, { urls: Object.values(POSTERS), from: -3.1, to: 1.2, y: floor + 1.85 });
 const pylon = createPylonSign(scene, { position: [-6.05, WALK.top, -5.25], rotationY: Math.atan2(6.05, 5.25) });
 
@@ -140,6 +144,7 @@ const pole = createPole(scene, {
 });
 const car = createCar(scene, { laneZ: street.frontZ + 0.52 });
 car.onPass = (speed) => sfx.carPass((PLINTH.maxX - PLINTH.minX + 2.4) / speed);
+car.onFall = () => sfx.fall();
 const rain = createRain(scene, { count: 1800 });
 const puddles = createPuddles(scene, { puddles: street.puddles });
 const steam = [
@@ -169,6 +174,7 @@ walker.setObstacles([
     box(maxX, maxX + T, minZ, maxZ),
     ...cabinets.map((c) => footprint(c.group)),
     footprint(counter.root), footprint(juke.root), footprint(couch.root), post(-0.7, -0.7, 0.55),
+    ...shelves.blocks,
     ...plants.map((p) => footprint(p.root, -0.05)),
     footprint(vending.root), footprint(hydrant.root), footprint(news.root), footprint(bench.root), footprint(trash.root),
     footprint(alley.root), post(-5.9, 3.35, 0.16), post(-6.05, -5.25, 0.38), post(4.2, -5.4, 0.14), post(openSign.root.position.x, openSign.root.position.z, 0.1),
@@ -179,7 +185,7 @@ walker.onStep = (intensity, inside) => sfx.step(intensity, inside);
 // well. Things you can poke keep their own merged meshes (so they can bob
 // when hovered); the folding walls merge into themselves; everything else
 // in the world shares one set of draw calls.
-const pokeable = [...cabinets.map((c) => c.group), counter.root, juke.root, rocket.root, vending.root, trash.root];
+const pokeable = [...cabinets.map((c) => c.group), counter.root, juke.root, rocket.root, vending.root, trash.root, shelves.root, ...shelves.figures.map((f) => f.body), counter.prizeShelf, ...counter.prizeToys];
 for (const root of pokeable) batchStatic(root);
 for (const w of Object.values(walls)) batchStatic(w.upper);
 const world = new THREE.Group();
@@ -193,7 +199,7 @@ batchStatic([
 // The puddles only see the street: everything inside the arcade lives on
 // layer 1, which the camera and the lights see but the reflection doesn't.
 const INTERIOR = 1;
-for (const root of [...cabinets.map((c) => c.group), counter.root, juke.root, rocket.root, couch.root, ...plants.map((p) => p.root), ...Object.values(walls).map((w) => w.upper)]) {
+for (const root of [...cabinets.map((c) => c.group), counter.root, juke.root, rocket.root, couch.root, shelves.root, ...plants.map((p) => p.root), ...Object.values(walls).map((w) => w.upper)]) {
     root.traverse((o) => o.layers.set(INTERIOR));
 }
 camera.layers.enable(INTERIOR);
@@ -272,6 +278,28 @@ interaction.add({
     onClick: () => {
         car.honk();
         sfx.honk();
+    },
+});
+// every figure on the collectibles shelves hops when poked
+for (const f of shelves.figures) {
+    interaction.add({
+        id: `figure:${f.kind}`, name: f.name, sub: `${f.sub} &nbsp;·&nbsp; <b>poke</b>`, color: '#a98bff',
+        meshes: allMeshes(f.root), root: f.root,
+        onClick: () => {
+            shelves.poke(f);
+            sfx.boing();
+        },
+    });
+}
+const prizeLines = ['That one\u2019s 5,000 tickets.', 'You have 0 tickets. Pixel has 40,000.', 'Look, don\u2019t touch. (You touched.)', 'Every prize is one more game away.'];
+let prizePokes = 0;
+interaction.add({
+    id: 'prizes', name: 'The prize wall', sub: 'plush, trinkets, one very big bear &nbsp;·&nbsp; <b>poke</b>', color: '#ffb347',
+    meshes: allMeshes(counter.prizeShelf), root: counter.prizeShelf,
+    onClick: () => {
+        const bear = counter.wiggle();
+        sfx.boing();
+        ui.toast(bear ? 'The big bear is 10,000 tickets. Start saving.' : prizeLines[prizePokes++ % prizeLines.length]);
     },
 });
 interaction.add({
@@ -524,7 +552,7 @@ let beat = 0;
 const size = new THREE.Vector2();
 const frustum = new THREE.Frustum();
 const viewProj = new THREE.Matrix4();
-const updaters = [counter, juke, rocket, clock, board, pylon, lamp, vending, trash, car, ...strings];
+const updaters = [counter, juke, rocket, clock, board, pylon, lamp, vending, trash, car, shelves, wallSigns, ...strings];
 
 // Title card: the camera idles further out and lower, looking up at the corner.
 const titleOrbit = { az: 0.95, el: 0.2, dist: 36 };

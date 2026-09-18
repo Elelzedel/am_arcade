@@ -17,10 +17,14 @@ export function createPylonSign(scene, { position, rotationY = 0 }) {
 
     // the pylon: a square column on a plinth, with a service ladder
     add(root, rbox(0.7, 0.3, 0.7, 0.05, 2), mat('#3a3553', { rough: 0.8 }), { p: [0, 0.15, 0] });
-    add(root, rbox(0.3, lift + 0.1, 0.3, 0.04, 2), steel, { p: [0, (lift + 0.1) / 2 + 0.2, 0] });
-    for (const x of [-0.08, 0.08]) add(root, rbox(0.02, lift - 0.8, 0.02, 0.006, 1), steel, { p: [x, lift / 2 + 0.3, 0.2] });
-    for (let y = 0.8; y < lift - 0.2; y += 0.3) add(root, rbox(0.18, 0.018, 0.018, 0.006, 1), steel, { p: [0, y, 0.2] });
-    add(root, rbox(W * 0.8, 0.12, 0.34, 0.03, 2), steel, { p: [0, lift - 0.06, 0] });
+    // the column stops under the cross-beam; nothing passes through the sign
+    const colTop = lift - 0.12;
+    add(root, rbox(0.24, colTop - 0.2, 0.24, 0.04, 2), steel, { p: [0, (colTop + 0.2) / 2, 0] });
+    for (const x of [-0.08, 0.08]) add(root, rbox(0.02, colTop - 0.9, 0.02, 0.006, 1), steel, { p: [x, (colTop + 0.7) / 2, 0.17] });
+    for (let y = 0.8; y < colTop - 0.25; y += 0.3) add(root, rbox(0.18, 0.018, 0.018, 0.006, 1), steel, { p: [0, y, 0.17] });
+    add(root, rbox(W * 0.8, 0.1, 0.26, 0.03, 2), steel, { p: [0, lift - 0.07, 0] });
+    // knee braces from the column up to the beam
+    for (const x of [-0.31, 0.31]) add(root, rbox(0.04, 0.5, 0.04, 0.01, 1), steel, { p: [x, lift - 0.3, 0], r: [0, 0, x > 0 ? -0.9 : 0.9] });
 
     // the cabinet
     add(root, rbox(W, H, 0.28, 0.05, 3), mat('#1b1230', { rough: 0.55, metal: 0.2 }), { p: [0, lift + H / 2, 0] });
@@ -139,18 +143,44 @@ export function createWallSigns(walls, { coinAt, gameOnAt }) {
     walls.back.mount(coinSpill.mesh, coinAt, floor + 2.5, 0.012);
     power.add(0.4, (v) => { coin.setLevel(v); coinSpill.setLevel(v); });
 
-    // "GAME ON" arrow over the left-wall machines
-    const gameOn = neonPanel({
-        width: 1.5, height: 0.6, ppm: 380, intensity: 1.8,
+    // "GAME ON" over the left-wall machines, with a pixel invader beside it
+    // that marches on the spot, two frames, like it does on the screen
+    const invaderRows = [
+        ['..X.....X..', '...X...X...', '..XXXXXXX..', '.XX.XXX.XX.', 'XXXXXXXXXXX', 'X.XXXXXXX.X', 'X.X.....X.X', '...XX.XX...'],
+        ['..X.....X..', 'X..X...X..X', 'X.XXXXXXX.X', 'XXX.XXX.XXX', 'XXXXXXXXXXX', '.XXXXXXXXX.', '..X.....X..', '.X.......X.'],
+    ];
+    const W = 2.1, H = 0.62;
+    const text = neonPanel({
+        width: W, height: H, ppm: 360, intensity: 1.8,
         draw(ctx, w, h, tube) {
-            tube.text('GAME ON', w * 0.5, h * 0.42, { font: `${h * 0.34}px ${FONTS.neon}`, color: P.mint, width: h * 0.012, fill: true });
-            tube.path((c) => { c.moveTo(w * 0.18, h * 0.8); c.lineTo(w * 0.82, h * 0.8); c.moveTo(w * 0.76, h * 0.7); c.lineTo(w * 0.83, h * 0.8); c.lineTo(w * 0.76, h * 0.9); }, { color: P.violet, width: h * 0.02 });
+            tube.text('GAME ON', w * 0.6, h * 0.52, { font: `${h * 0.42}px ${FONTS.neon}`, color: P.mint, width: h * 0.012, fill: true });
+            tube.path((c) => { c.moveTo(w * 0.33, h * 0.84); c.lineTo(w * 0.87, h * 0.84); }, { color: P.violet, width: h * 0.018 });
         },
     });
-    const gameOnSpill = lightSpill(P.mint, 2.6, 1.4, 0.25);
-    walls.left.mount(gameOn.mesh, gameOnAt, floor + 2.5, 0.03);
+    const frames = invaderRows.map((rows) => neonPanel({
+        width: W, height: H, ppm: 360, intensity: 1.8,
+        draw(ctx, w, h, tube) {
+            const px = h * 0.058;
+            const x0 = w * 0.16 - px * 5.5, y0 = h * 0.5 - px * 4;
+            tube.path((c) => {
+                rows.forEach((row, r) => [...row].forEach((ch, i) => {
+                    if (ch === 'X') c.rect(x0 + i * px + px * 0.12, y0 + r * px + px * 0.12, px * 0.76, px * 0.76);
+                }));
+            }, { color: P.pink, width: px * 0.35 });
+        },
+    }));
+    const gameOnSpill = lightSpill(P.mint, 3.2, 1.4, 0.25);
+    walls.left.mount(text.mesh, gameOnAt, floor + 2.5, 0.03);
+    frames.forEach((f) => walls.left.mount(f.mesh, gameOnAt, floor + 2.5, 0.031));
     walls.left.mount(gameOnSpill.mesh, gameOnAt, floor + 2.45, 0.012);
-    power.add(0.9, (v) => { gameOn.setLevel(v); gameOnSpill.setLevel(v); });
+    let level = 0;
+    power.add(0.9, (v) => { level = v; text.setLevel(v); gameOnSpill.setLevel(v); });
+    return {
+        update(dt, time) {
+            const step = Math.floor(time * 1.6) % 2;
+            frames.forEach((f, i) => f.setLevel(i === step ? level : 0));
+        },
+    };
 }
 
 // The five game paintings, framed on the right-hand wall.

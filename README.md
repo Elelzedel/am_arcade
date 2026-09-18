@@ -32,7 +32,9 @@ npm run build    # production build in dist/
 | click the vending machine | 75¢, and a can clunks into the tray |
 | click the rocket | a 25¢ ride that goes nowhere, enthusiastically |
 | click the bin | somebody lives in there |
-| click the car | it's just trying to get home; honk anyway |
+| click the car | it's just trying to get home; honk anyway (the road ends, and so does the car) |
+| click a figure on the corner shelves | each of the dozen collectibles hops and spins |
+| click the prize wall | something wiggles; the big bear is 10,000 tickets |
 | `M` | sound on / off |
 
 On touch screens a d-pad and A/B buttons appear while you're playing.

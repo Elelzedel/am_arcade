@@ -287,6 +287,22 @@ class Sfx {
             : { type: 'bandpass', freq: 2600, q: 0.8, peak: level * 1.2, a: 0.004, r: 0.12 });
     }
 
+    // a toy's springy hop
+    boing() {
+        this.tone(320, { type: 'sine', peak: 0.07, a: 0.005, r: 0.22, to: 760 });
+        this.tone(640, { type: 'triangle', t: 0.02, peak: 0.02, a: 0.005, r: 0.18, to: 1200 });
+    }
+
+    // over the edge: a slide-whistle fall, a panicked honk, and far, far below, a bonk
+    fall() {
+        if (!this.ensure() || this.muted) return;
+        this.tone(1400, { type: 'sine', t: 0.35, a: 0.05, peak: 0.05, r: 1.6, to: 180 });
+        this.tone(1410, { type: 'triangle', t: 0.35, a: 0.05, peak: 0.02, r: 1.6, to: 182 });
+        for (const [f, t] of [[392, 0.1], [370, 0.28]]) this.tone(f, { type: 'square', t, peak: 0.03, a: 0.01, r: 0.14 });
+        this.tone(90, { type: 'sine', t: 2.4, peak: 0.05, a: 0.005, r: 0.3, to: 45 });
+        this.noiseBurst({ t: 2.4, type: 'lowpass', freq: 400, peak: 0.04, r: 0.25 });
+    }
+
     honk() {
         for (const [f, t] of [[392, 0], [494, 0], [392, 0.22], [494, 0.22]]) this.tone(f, { type: 'square', t, peak: 0.035, a: 0.01, r: 0.16 });
     }
