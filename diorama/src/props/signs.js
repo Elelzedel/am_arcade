@@ -184,7 +184,7 @@ export function createClock(scene, { position, rotationY = 0 }) {
     add(root, new THREE.TorusGeometry(R * 0.95, 0.012, 8, 64), ringMat, { p: [0, 0, 0.06], cast: false });
     power.add(1.1, (v) => ringMat.color.copy(ringMat.userData.baseColor).multiplyScalar(2.4 * v));
     const hand = (len, width, color) => {
-        const pivot = group(root, { p: [0, 0, 0.06] });
+        const pivot = group(root, { p: [0, 0, 0.06], dynamic: true });
         add(pivot, rbox(width, len, 0.008, width / 2.2, 1), mat(color, { rough: 0.4, metal: 0.3 }), { p: [0, len / 2 - 0.02, 0], cast: false });
         return pivot;
     };

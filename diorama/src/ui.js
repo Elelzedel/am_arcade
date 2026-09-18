@@ -58,12 +58,19 @@ export default class Interface {
         this.el.loader.classList.remove('solid');
         this.el.progress.classList.add('hidden');
         this.el.status.classList.add('hidden');
-        setTimeout(() => this.el.enter.classList.remove('hidden'), 250);
+        setTimeout(() => {
+            this.el.enter.classList.remove('hidden');
+            this.el.enter.inert = false;
+        }, 250);
     }
 
     setMode(mode, cabinet) {
         this.mode = mode;
-        const show = (el, on) => el.classList.toggle('hidden', !on);
+        // hidden chrome is also taken out of the tab order and the a11y tree
+        const show = (el, on) => {
+            el.classList.toggle('hidden', !on);
+            el.inert = !on;
+        };
         const explore = mode === 'explore';
         const playing = mode === 'playing';
         show(this.el.loader, mode === 'title');
@@ -89,7 +96,12 @@ export default class Interface {
             const best = cabinet.game.highScores.entries[0];
             this.el.gametitle.querySelector('.s').textContent = best ? `high score ${Number(best.score).toLocaleString('en-US')} · ${best.name}` : '';
             const keys = (k) => k.split('/').map((x) => x.trim()).filter(Boolean).map((x) => `<kbd>${x}</kbd>`).join('');
-            const rows = (meta.controls || []).slice(0, 4).map(([k, label]) => `<span>${keys(k)}${label.toLowerCase()}</span>`);
+            // Some rows are tips rather than keys ("CATCH CAPSULES"): no key caps for those.
+            const KEYWORDS = new Set(['ARROWS', 'SPACE', 'ENTER', 'SHIFT', 'HOLD', 'WASD', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'OR']);
+            const isKey = (k) => k.split(/[\s/]+/).every((w) => w.length <= 3 || KEYWORDS.has(w));
+            const rows = (meta.controls || []).slice(0, 4).map(([k, label]) => (isKey(k)
+                ? `<span>${keys(k)}${label.toLowerCase()}</span>`
+                : `<span>${k.toLowerCase()} · ${label.toLowerCase()}</span>`));
             this.el.controls.innerHTML = rows.join('');
         }
     }
@@ -133,6 +145,7 @@ export default class Interface {
         this.el.npArtist.textContent = track.artist;
         this.el.nowplaying.style.setProperty('--c', track.color);
         this.el.nowplaying.classList.toggle('hidden', !(playing && this.mode === 'explore'));
+        this.el.nowplaying.inert = !(playing && this.mode === 'explore');
     }
 
     toggleMute() {
@@ -143,6 +156,7 @@ export default class Interface {
 
     showHelp(on) {
         this.el.help.classList.toggle('hidden', !on);
+        this.el.help.inert = !on;
     }
 
     updateClock() {

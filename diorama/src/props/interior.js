@@ -33,7 +33,7 @@ export function createRocketRide(scene, { position, rotationY = 0 }) {
     add(box, new THREE.PlaneGeometry(0.13, 0.13), new THREE.MeshStandardMaterial({ map: label, roughness: 0.6 }), { p: [0, 0.23, 0.071], cast: false });
 
     // the ship
-    const ship = group(root, { p: [0, 0.18, 0] });
+    const ship = group(root, { p: [0, 0.18, 0], dynamic: true });
     const body = group(ship, { p: [0, 0.22, 0] });
     const profile = [
         [0.0, 0.0], [0.13, 0.0], [0.2, 0.08], [0.24, 0.3], [0.245, 0.55], [0.22, 0.78], [0.16, 0.95], [0.08, 1.07], [0.0, 1.12],

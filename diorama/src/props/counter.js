@@ -26,7 +26,7 @@ function plush(parent, color, p, s = 1, rot = 0) {
 }
 
 function createCat(parent, position, rotationY) {
-    const root = group(parent, { p: position, r: [0, rotationY, 0], name: 'cat' });
+    const root = group(parent, { p: position, r: [0, rotationY, 0], name: 'cat', dynamic: true });
     // Tabby fur: soft darker bands painted across the back in object space,
     // so they wrap every part of the cat the way real markings do.
     const fur = new THREE.MeshStandardMaterial({ color: '#e0893f', roughness: 0.9 });

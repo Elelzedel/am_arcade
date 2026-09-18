@@ -453,7 +453,7 @@ export default class Cabinet {
         deck.position.copy(cf.position);
         deck.rotation.x = cf.rotationX;
         // joystick
-        const stick = group(deck, { p: [-INNER * 0.23, 0, 0.004] });
+        const stick = group(deck, { p: [-INNER * 0.23, 0, 0.004], dynamic: true });
         add(stick, new THREE.CylinderGeometry(0.03, 0.034, 0.012, 20), mat('#141018', { rough: 0.4 }), { r: [Math.PI / 2, 0, 0] });
         const shaftPivot = group(stick);
         add(shaftPivot, new THREE.CylinderGeometry(0.0055, 0.0055, 0.075, 10), mat('#d9d4e8', { rough: 0.2, metal: 1 }), { p: [0, 0, 0.04], r: [Math.PI / 2, 0, 0] });
@@ -464,7 +464,7 @@ export default class Cabinet {
         const capGeo = new THREE.CylinderGeometry(0.019, 0.019, 0.016, 22);
         const ringGeo = new THREE.TorusGeometry(0.023, 0.004, 8, 24);
         buttonColors.forEach((color, i) => {
-            const b = group(deck, { p: [INNER * (0.03 + i * 0.13), 0.02 - i * 0.012, 0.004] });
+            const b = group(deck, { p: [INNER * (0.03 + i * 0.13), 0.02 - i * 0.012, 0.004], dynamic: true });
             add(b, ringGeo, mat('#1d1826', { rough: 0.3, metal: 0.5 }), { cast: false });
             const capMaterial = new THREE.MeshPhysicalMaterial({ color, roughness: 0.25, clearcoat: 1, emissive: color, emissiveIntensity: 0.15 });
             const cap = add(b, capGeo, capMaterial, { p: [0, 0, 0.007], r: [Math.PI / 2, 0, 0] });
@@ -551,7 +551,9 @@ export default class Cabinet {
 
     /** Returns true when the screen wants redrawing this frame. */
     update(dt, time, audio) {
-        this.hover = damp(this.hover, this.hovered || this.active ? 1 : 0, 8, dt);
+        // Hover brightens the machine to beckon; once you're playing it the
+        // trim settles down so it doesn't glare at the edge of your eye.
+        this.hover = damp(this.hover, this.hovered && !this.active ? 1 : 0, 8, dt);
         if (this.power > 0.5) this.boot = Math.min(1, this.boot + dt * 1.6);
         const u = this.screenMat.uniforms;
         u.time.value = time;

@@ -46,6 +46,7 @@ export function add(parent, geometry, material, opts = {}) {
     m.castShadow = opts.cast !== false;
     m.receiveShadow = opts.receive !== false;
     if (opts.name) m.name = opts.name;
+    if (opts.dynamic) m.userData.dynamic = true;
     parent.add(m);
     return m;
 }
@@ -55,6 +56,8 @@ export function group(parent, opts = {}) {
     if (opts.p) g.position.set(...opts.p);
     if (opts.r) g.rotation.set(...opts.r);
     if (opts.name) g.name = opts.name;
+    // anything that moves after it's built; the static batcher leaves it be
+    if (opts.dynamic) g.userData.dynamic = true;
     if (parent) parent.add(g);
     return g;
 }

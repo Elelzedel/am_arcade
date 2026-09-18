@@ -79,7 +79,7 @@ export function createStreetLamp(scene, { position, rotationY = 0 }) {
     const mothMat = new THREE.MeshBasicMaterial({ color: '#fff4e0' });
     const rand = rng(77);
     for (let i = 0; i < 5; i++) {
-        const m = add(head, new THREE.SphereGeometry(0.009, 6, 4), mothMat, { cast: false, receive: false });
+        const m = add(head, new THREE.SphereGeometry(0.009, 6, 4), mothMat, { cast: false, receive: false, dynamic: true });
         moths.push({ m, a: rand() * 6, b: rand() * 6, r: 0.18 + rand() * 0.2, s: 1.5 + rand() * 2.5 });
     }
 
@@ -171,7 +171,7 @@ export function createVendingMachine(scene, { position, rotationY }) {
     add(root, new THREE.PlaneGeometry(0.012, 0.06), slotMat, { p: [colX, H * 0.38, D / 2 + 0.021], cast: false });
     // dispenser tray
     add(root, rbox(W * 0.62, 0.2, 0.03, 0.02, 2), mat('#150f19', { rough: 0.8 }), { p: [-W * 0.12, 0.3, D / 2 + 0.002] });
-    const flap = add(root, new THREE.PlaneGeometry(W * 0.58, 0.17), mat('#3a3346', { rough: 0.2, metal: 0.4 }), { p: [-W * 0.12, 0.3, D / 2 + 0.02], cast: false });
+    const flap = add(root, new THREE.PlaneGeometry(W * 0.58, 0.17), mat('#3a3346', { rough: 0.2, metal: 0.4 }), { p: [-W * 0.12, 0.3, D / 2 + 0.02], cast: false, dynamic: true });
 
     const glow = new THREE.PointLight('#ffe7d4', 0, 2.4, 1.8);
     glow.position.set(0, 1.2, D / 2 + 0.5);
@@ -286,7 +286,7 @@ export function createTrashCan(scene, { position }) {
     add(root, new THREE.CylinderGeometry(0.035, 0.035, 0.12, 12), mat('#48c8ff', { rough: 0.3, metal: 0.6 }), { p: [-0.1, H + 0.0, 0.05], r: [0.9, 0, 0.5] });
 
     // the raccoon
-    const coon = group(root, { p: [0, H - 0.25, 0] });
+    const coon = group(root, { p: [0, H - 0.25, 0], dynamic: true });
     const fur = mat('#8c8797', { rough: 0.95 });
     const black = mat('#1d1a22', { rough: 0.8 });
     const white = mat('#ecE6ee'.toLowerCase(), { rough: 0.9 });

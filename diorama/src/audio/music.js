@@ -259,7 +259,7 @@ export class Jukebox {
             this.nextTime += stepDur;
         }
         const now = ctx.currentTime;
-        this.beatTimes = this.beatTimes.filter((bt) => bt > now - 1);
+        this.beatTimes = this.beatTimes.filter((bt) => bt > now - 4);
     }
 
     // seconds since the most recent beat that has actually sounded

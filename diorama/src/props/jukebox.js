@@ -69,7 +69,7 @@ export function createJukebox(scene, { position, rotationY }) {
     windowGeo.translate(0, 0.02, 0);
     const inner = add(root, windowGeo, mat('#120a18', { rough: 0.8 }), { p: [0, 0.35, D / 2 + 0.017], s: [1, 0.72, 1], cast: false });
     void inner;
-    const record = group(root, { p: [0, BODY + 0.08, D / 2 + 0.03] });
+    const record = group(root, { p: [0, BODY + 0.08, D / 2 + 0.03], dynamic: true });
     const labelTex = (track) => canvasTexture(512, 512, (ctx, w) => {
         ctx.fillStyle = '#0c0a10';
         ctx.fillRect(0, 0, w, w);
@@ -92,7 +92,7 @@ export function createJukebox(scene, { position, rotationY }) {
     const discMat = new THREE.MeshStandardMaterial({ map: labels[0], roughness: 0.3, metalness: 0.2 });
     const disc = add(record, new THREE.CircleGeometry(0.2, 48), discMat, { cast: false });
     // tonearm
-    const arm = group(root, { p: [0.25, BODY + 0.25, D / 2 + 0.035] });
+    const arm = group(root, { p: [0.25, BODY + 0.25, D / 2 + 0.035], dynamic: true });
     add(arm, new THREE.CylinderGeometry(0.02, 0.02, 0.02, 16), chrome, { r: [Math.PI / 2, 0, 0], cast: false });
     add(arm, rbox(0.012, 0.2, 0.01, 0.004, 1), chrome, { p: [-0.03, -0.1, 0.01], r: [0, 0, -0.35], cast: false });
 

@@ -165,7 +165,7 @@ export function createSteam(scene, { origin, count = 26, height = 1.6, spread = 
             void main() {
                 vec2 c = gl_PointCoord - 0.5;
                 float d = length(c);
-                float a = smoothstep(0.5, 0.0, d);
+                float a = exp(-d * d * 16.0) * smoothstep(0.5, 0.35, d);
                 a *= smoothstep(0.0, 0.15, vAge) * smoothstep(1.0, 0.45, vAge) * opacity;
                 gl_FragColor = vec4(color, a);
             }

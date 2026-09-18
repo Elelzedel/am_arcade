@@ -3,7 +3,8 @@ import { createStage } from './stage.js';
 import CameraRig from './cameraRig.js';
 import { loadFonts } from './fonts.js';
 import { power } from './power.js';
-import { ROOM, WALK } from './layout.js';
+import { ROOM, WALK, PLINTH } from './layout.js';
+import { createCar } from './props/car.js';
 import { P } from './palette.js';
 import { damp } from './util.js';
 import { createVoid } from './scene/void.js';
@@ -20,6 +21,7 @@ import {
 } from './props/streetProps.js';
 import { createRain, createSteam } from './fx/weather.js';
 import { createPuddles } from './fx/puddles.js';
+import { batchStatic } from './batch.js';
 import { jukebox } from './audio/music.js';
 import { sfx } from './audio/sfx.js';
 import { setMasterVolume, resumeAudio } from '../../games/shared/audio.js';
@@ -108,6 +110,8 @@ const strings = [
     createStringLights(scene, { anchors: garland(new THREE.Vector3(ROOM.minX + 0.06, nailY, ROOM.minZ + 0.06), new THREE.Vector3(ROOM.maxX - 0.08, nailY, ROOM.minZ + 0.06), 5), sag: 0.2, colors: bulbColors }),
     createStringLights(scene, { anchors: garland(new THREE.Vector3(ROOM.minX + 0.06, nailY, ROOM.minZ + 0.06), new THREE.Vector3(ROOM.minX + 0.06, nailY, ROOM.maxZ - 0.08), 4), sag: 0.2, colors: bulbColors, delay: 2.45 }),
 ];
+const car = createCar(scene, { laneZ: street.frontZ + 0.52 });
+car.onPass = (speed) => sfx.carPass((PLINTH.maxX - PLINTH.minX + 2.4) / speed);
 const rain = createRain(scene, { count: 1600 });
 const puddles = createPuddles(scene, { puddles: street.puddles });
 window.addEventListener('resize', () => puddles.resize(window.innerWidth, window.innerHeight));
@@ -116,6 +120,11 @@ const steam = [
     createSteam(scene, { origin: bench.steamAt, count: 12, height: 0.4, spread: 0.05, size: 0.7, rate: 0.3, opacity: 0.16, color: '#f4efff' }),
 ];
 ui.progress(0.8, 'tuning the jukebox…');
+
+// Everything that never moves is merged per material: a few hundred draw
+// calls instead of a couple of thousand, in every shadow pass as well.
+let merged = 0;
+for (const child of scene.children.slice()) if (child.isGroup) merged += batchStatic(child);
 
 // ---- interaction --------------------------------------------------------------------
 function allMeshes(root) {
@@ -147,7 +156,7 @@ interaction.add({
 });
 interaction.add({
     id: 'jukebox', name: 'Jukebox', sub: '<b>drop a record</b>', color: '#ff9a6b',
-    meshes: juke.hitMeshes, root: juke.root,
+    meshes: allMeshes(juke.root), root: juke.root,
     onClick: () => {
         if (!jukebox.playing) jukebox.play();
         else jukebox.next();
@@ -155,7 +164,7 @@ interaction.add({
 });
 interaction.add({
     id: 'vending', name: 'Fizz! machine', sub: '<b>buy a soda</b> &nbsp;·&nbsp; 75¢', color: '#ff4f6a',
-    meshes: vending.hitMeshes, root: vending.root,
+    meshes: allMeshes(vending.root), root: vending.root,
     onClick: () => {
         const f = vending.vend();
         sfx.coin();
@@ -165,7 +174,7 @@ interaction.add({
 });
 interaction.add({
     id: 'rocket', name: 'AM-1 Rocket', sub: '<b>ride</b> &nbsp;·&nbsp; 25¢', color: P.cyan,
-    meshes: rocket.hitMeshes, root: rocket.root,
+    meshes: allMeshes(rocket.root), root: rocket.root,
     onClick: () => {
         if (rocket.riding) return;
         rocket.launch();
@@ -175,12 +184,20 @@ interaction.add({
 });
 interaction.add({
     id: 'trash', name: 'Bin', sub: '<b>rummage</b>', color: '#9fd6b8',
-    meshes: trash.hitMeshes, root: trash.root,
+    meshes: allMeshes(trash.root), root: trash.root,
     onClick: () => {
         trash.peek(3.2);
         sfx.rustle();
         setTimeout(() => sfx.squeak(), 350);
         ui.toast('A raccoon regards you. You regard the raccoon.');
+    },
+});
+interaction.add({
+    id: 'car', name: 'Somebody heading home', sub: '<b>honk</b>', color: '#3fb5a8',
+    meshes: car.hitMeshes, root: car.root,
+    onClick: () => {
+        car.honk();
+        sfx.honk();
     },
 });
 interaction.add({
@@ -301,7 +318,7 @@ const clockTime = new THREE.Clock();
 let time = 0;
 let beat = 0;
 const size = new THREE.Vector2();
-const updaters = [counter, juke, rocket, clock, board, rooftop, lamp, vending, trash, ...strings];
+const updaters = [counter, juke, rocket, clock, board, rooftop, lamp, vending, trash, car, ...strings];
 
 // Title card: the camera idles further out and lower, looking up at the corner.
 const titleOrbit = { az: 0.95, el: 0.19, dist: 31 };
@@ -309,7 +326,8 @@ const titleOrbit = { az: 0.95, el: 0.19, dist: 31 };
 const titlePose = { position: new THREE.Vector3(), target: rig.home.target.clone().add(new THREE.Vector3(0, 2.9, 0)), fov: 26 };
 const placeTitle = (a) => {
     const t = titlePose.target;
-    const { el, dist } = titleOrbit;
+    const { el } = titleOrbit;
+    const dist = titleOrbit.dist * rig.fit;
     titlePose.position.set(t.x + Math.sin(a) * Math.cos(el) * dist, t.y + Math.sin(el) * dist, t.z + Math.cos(a) * Math.cos(el) * dist);
 };
 placeTitle(titleOrbit.az);
@@ -318,13 +336,51 @@ rig.fixedPose = titlePose;
 rig.enabled = false;
 interaction.enabled = false;
 
+// Resolution governor: if frames run long, render fewer pixels; if there's
+// headroom for a while, try a step back up. Never flips back and forth.
+const governor = {
+    levels: [...new Set([Math.min(window.devicePixelRatio, 2), 1.5, 1.25, 1, 0.8].filter((r) => r <= Math.min(window.devicePixelRatio, 2)))],
+    index: 0, acc: 0, frames: 0, calm: 0, strikes: 0,
+    tick(dt) {
+        if (document.hidden) return;
+        this.acc += dt;
+        this.frames++;
+        if (this.acc < 2) return;
+        const avg = this.acc / this.frames;
+        this.acc = 0;
+        this.frames = 0;
+        if (avg > 1 / 40 && this.index < this.levels.length - 1) {
+            this.index++;
+            this.strikes++;
+            this.calm = 0;
+            this.apply();
+        } else if (avg < 1 / 58) {
+            this.calm += 2;
+            // step back up only after a long calm, and less eagerly each time
+            if (this.index > 0 && this.calm > 12 * this.strikes) {
+                this.index--;
+                this.calm = 0;
+                this.apply();
+            }
+        }
+    },
+    apply() {
+        stage.pixelRatio = this.levels[this.index];
+        stage.resize();
+    },
+};
+
 function frame() {
     const dt = Math.min(clockTime.getDelta(), 0.1);
     time += dt;
+    governor.tick(dt);
     if (state === 'title') placeTitle(titleOrbit.az + Math.sin(time * 0.06) * 0.1);
 
     rig.update(dt);
     power.update(dt, time);
+    // up close to a screen the glow backs off, so the game stays crisp
+    const focused = state === 'playing' || (state === 'flying' && rig.flight?.then === 'fixed');
+    stage.bloom.strength = damp(stage.bloom.strength, focused ? 0.18 : 0.7, 3, dt);
     const since = jukebox.sinceBeat();
     beat = damp(beat, Number.isFinite(since) ? Math.exp(-since * 7) : 0, 30, dt);
 
@@ -360,6 +416,6 @@ if (SKIP) {
 }
 
 window.arcade = {
-    stage, rig, scene, cabinets, power, interaction, play, leave, enter, jukebox, counter, trash, rocket, vending, ui,
+    stage, rig, scene, cabinets, power, interaction, play, leave, enter, jukebox, counter, trash, rocket, vending, ui, car,
     get state() { return state; },
 };

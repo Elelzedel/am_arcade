@@ -235,6 +235,52 @@ class Sfx {
         this.tone(2600, { type: 'sine', t: 0.12, peak: 0.04, a: 0.01, r: 0.08, to: 3400 });
     }
 
+    // tyres hissing through the wet, rising and falling as it passes
+    carPass(seconds) {
+        if (!this.ensure() || this.muted) return;
+        const ctx = this.ctx;
+        const t = ctx.currentTime;
+        const src = ctx.createBufferSource();
+        src.buffer = this.noise;
+        src.loop = true;
+        const f = ctx.createBiquadFilter();
+        f.type = 'bandpass';
+        f.Q.value = 0.8;
+        f.frequency.setValueAtTime(700, t);
+        f.frequency.linearRampToValueAtTime(1500, t + seconds * 0.5);
+        f.frequency.linearRampToValueAtTime(600, t + seconds);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.09, t + seconds * 0.5);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+        const pan = ctx.createStereoPanner();
+        pan.pan.setValueAtTime(-0.9, t);
+        pan.pan.linearRampToValueAtTime(0.9, t + seconds);
+        src.connect(f).connect(g).connect(pan).connect(this.out);
+        src.start(t);
+        src.stop(t + seconds + 0.1);
+        // and a soft engine burble underneath
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(48, t);
+        o.frequency.linearRampToValueAtTime(58, t + seconds * 0.5);
+        o.frequency.linearRampToValueAtTime(44, t + seconds);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 180;
+        const eg = ctx.createGain();
+        eg.gain.setValueAtTime(0.0001, t);
+        eg.gain.exponentialRampToValueAtTime(0.05, t + seconds * 0.5);
+        eg.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+        o.connect(lp).connect(eg).connect(pan);
+        o.start(t);
+        o.stop(t + seconds + 0.1);
+    }
+
+    honk() {
+        for (const [f, t] of [[392, 0], [494, 0], [392, 0.22], [494, 0.22]]) this.tone(f, { type: 'square', t, peak: 0.035, a: 0.01, r: 0.16 });
+    }
+
     drip() {
         this.tone(1200 + Math.random() * 900, { type: 'sine', peak: 0.012, a: 0.002, r: 0.06, to: 500 });
     }
