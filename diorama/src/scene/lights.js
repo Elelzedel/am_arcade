@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { P } from '../palette.js';
 import { ROOM } from '../layout.js';
+import { MOBILE } from '../stage.js';
 
 // Three kinds of light tell the story of 2 AM:
 //   the moon, cool and low, laying long shadows across the street;
@@ -14,7 +15,7 @@ export function createLights(scene) {
     moon.position.set(9, 14, 7);
     moon.target.position.set(-0.5, 0, -0.5);
     moon.castShadow = true;
-    moon.shadow.mapSize.set(2048, 2048);
+    moon.shadow.mapSize.setScalar(MOBILE ? 1024 : 2048);
     const cam = moon.shadow.camera;
     cam.left = -11; cam.right = 11; cam.top = 11; cam.bottom = -11; cam.near = 2; cam.far = 40;
     moon.shadow.bias = -0.0004;

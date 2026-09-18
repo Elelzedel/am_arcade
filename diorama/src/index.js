@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createStage, TIERS } from './stage.js';
+import { createStage, TIERS as DESKTOP_TIERS, MOBILE_TIERS, MOBILE } from './stage.js';
 import CameraRig from './cameraRig.js';
 import Walker from './walker.js';
 import { loadFonts } from './fonts.js';
@@ -32,6 +32,7 @@ import { installIcons } from '../../games/shared/icons.js';
 import { POSTERS } from '../../games/shared/art.js';
 import Interface from './ui.js';
 import Interaction from './interaction.js';
+import TouchControls, { SCHEMES, TOUCH_PROMPTS } from './touch.js';
 
 import TankGame from '../../games/tank-game/src/game.js';
 import NeonRacer from '../../games/neon-racer/src/game.js';
@@ -42,7 +43,10 @@ import NeonSnake from '../../games/neon-snake/src/game.js';
 const params = new URLSearchParams(location.search);
 // ?skip jumps straight past the title card; ?quality=high|medium|low|potato pins a tier
 const SKIP = params.has('skip');
-const PINNED = TIERS.find((t) => t.name === params.get('quality'));
+const TIERS = MOBILE ? MOBILE_TIERS : DESKTOP_TIERS;
+const PINNED = [...DESKTOP_TIERS, ...MOBILE_TIERS].find((t) => t.name === params.get('quality'));
+// fingers rather than a mouse: the games get touch controls and tap prompts
+const TOUCH = matchMedia('(pointer: coarse)').matches;
 
 installIcons({ description: 'A tiny arcade on a rainy street corner, open all night.' });
 const ui = new Interface();
@@ -77,7 +81,8 @@ const LAYOUT = [
     { Game: NeonSnake, p: [LEFT, floor, -1.25], r: Math.PI / 2 },
 ];
 const cabinets = LAYOUT.map(({ Game, p, r }) => {
-    const c = new Cabinet({ GameClass: Game, position: new THREE.Vector3(...p), rotationY: r });
+    const gameOptions = TOUCH ? { attractPrompt: 'TAP TO PLAY', prompts: TOUCH_PROMPTS, controls: SCHEMES[Game.meta.id].controls } : {};
+    const c = new Cabinet({ GameClass: Game, position: new THREE.Vector3(...p), rotationY: r, gameOptions });
     scene.add(c.group);
     return c;
 });
@@ -145,7 +150,7 @@ const pole = createPole(scene, {
 const car = createCar(scene, { laneZ: street.frontZ + 0.52 });
 car.onPass = (speed) => sfx.carPass((PLINTH.maxX - PLINTH.minX + 2.4) / speed);
 car.onFall = () => sfx.fall();
-const rain = createRain(scene, { count: 1800 });
+const rain = createRain(scene, { count: MOBILE ? 900 : 1800 });
 const puddles = createPuddles(scene, { puddles: street.puddles });
 const steam = [
     createSteam(scene, { origin: street.manhole.clone().setY(0.03), count: 40, height: 1.9, spread: 0.45, size: 4.5, rate: 0.08, opacity: 0.06 }),
@@ -333,10 +338,11 @@ async function play(cabinet) {
     sfx.whoosh(true);
     ui.setMode('flying');
     if (from === 'walk') rig.lookTarget = walker.pose().target;
-    await rig.flyTo(cabinet.playPose(camera.aspect), { duration: from === 'walk' ? 1.0 : 1.55, arc: from === 'walk' ? 0.05 : 0.5 });
+    await rig.flyTo(cabinet.playPose(camera.aspect, playLayout()), { duration: from === 'walk' ? 1.0 : 1.55, arc: from === 'walk' ? 0.05 : 0.5 });
     active = cabinet;
     active.returnTo = from;
     cabinet.setActive(true);
+    touch?.show(cabinet.meta.id, cabinet.color);
     for (const c of cabinets) c.setDetail(c === cabinet);
     jukebox.setDuck(1);
     sfx.setFocus(1);
@@ -351,6 +357,7 @@ async function leave() {
     active = null;
     for (const code of held) cabinet.keyUp(code);
     held.clear();
+    touch?.hide();
     cabinet.setActive(false);
     jukebox.setDuck(0);
     sfx.setFocus(0);
@@ -489,53 +496,67 @@ window.addEventListener('blur', () => {
     if (active) for (const code of held) active.keyUp(code);
     held.clear();
 });
-ui.onPad = (code, down) => {
-    if (!active) return;
-    if (down) active.keyDown(code, false);
-    else active.keyUp(code);
-};
+// Room kept clear around the tube while playing: the title above it, and on
+// a phone held upright, the bottom of the screen for the thumbs.
+function playLayout() {
+    const h = window.innerHeight;
+    if (!TOUCH) return { top: 0.07, bottom: 0.07 };
+    return camera.aspect < 1 ? { top: 76 / h, bottom: 0.42 } : { top: 56 / h, bottom: 0.03, margin: 1.04 };
+}
+
+const touch = TOUCH ? new TouchControls({
+    keyDown: (code) => active?.keyDown(code, false),
+    keyUp: (code) => active?.keyUp(code),
+    game: () => active?.game,
+    screenRect: () => active.screenRect(camera),
+}) : null;
 window.addEventListener('resize', () => {
     // keep the tube framed if the window changes shape mid-game
-    if (state === 'playing' && active) rig.fixedPose = active.playPose(camera.aspect);
+    if (state === 'playing' && active) rig.fixedPose = active.playPose(camera.aspect, playLayout());
 });
 
 // ---- quality ------------------------------------------------------------------------
-// Starts from the last tier that held up on this machine (or a guess), then
-// steps down when frames run long and, cautiously, back up when there's room.
-const saved = TIERS.findIndex((t) => t.name === localStorage.getItem('am-arcade:tier'));
+// Starts from the tier that last held up on this device (or the top of its
+// list), then steps down when frames run long and, cautiously, back up when
+// there's room. It only judges while someone is looking around, never while
+// shaders compile or the intro plays, and it judges the median frame, so
+// the odd hitch doesn't count against the device.
+const TIER_KEY = `am-arcade:tier:v2:${MOBILE ? 'mobile' : 'desktop'}`;
+const saved = TIERS.findIndex((t) => t.name === localStorage.getItem(TIER_KEY));
 const governor = {
-    index: PINNED ? TIERS.indexOf(PINNED) : saved >= 0 ? saved : (window.devicePixelRatio > 1.5 ? 1 : 0),
-    acc: 0, frames: 0, calm: 0, strikes: 0, grace: 3,
+    index: PINNED ? -1 : Math.max(0, saved),
+    samples: [], calm: 0, strikes: 0, grace: 4,
+    // phones get a little more latitude: sharp and steady beats fast and smudged
+    budget: MOBILE ? 1 / 38 : 1 / 50,
     apply() {
-        const tier = TIERS[this.index];
+        const tier = PINNED || TIERS[this.index];
         stage.setTier(tier);
         puddles.setQuality(tier.reflect, tier.reflectEvery);
         lamp.light.castShadow = tier.lampShadow;
         for (const c of cabinets) c.interval = 1 / tier.attract;
-        try { localStorage.setItem('am-arcade:tier', tier.name); } catch { /* private mode */ }
+        if (!PINNED) try { localStorage.setItem(TIER_KEY, tier.name); } catch { /* private mode */ }
     },
     tick(dt) {
         if (PINNED || document.hidden) return;
-        // let shader compiles and the intro settle before judging
+        if (state !== 'explore' && state !== 'walk' && state !== 'playing') { this.samples.length = 0; return; }
         if (this.grace > 0) { this.grace -= dt; return; }
-        this.acc += dt;
-        this.frames++;
-        if (this.acc < 2) return;
-        const avg = this.acc / this.frames;
-        this.acc = 0;
-        this.frames = 0;
-        if (avg > 1 / 48 && this.index < TIERS.length - 1) {
+        this.samples.push(dt);
+        if (this.samples.length < 150) return;
+        const sorted = this.samples.sort((a, b) => a - b);
+        const median = sorted[sorted.length >> 1];
+        this.samples = [];
+        if (median > this.budget && this.index < TIERS.length - 1) {
             this.index++;
             this.strikes++;
             this.calm = 0;
-            this.grace = 1;
+            this.grace = 3;
             this.apply();
-        } else if (avg < 1 / 58) {
-            this.calm += 2;
-            if (this.index > 0 && this.calm > 16 * Math.max(1, this.strikes)) {
+        } else if (median < 1 / 57) {
+            this.calm++;
+            if (this.index > 0 && this.calm > 4 * Math.max(1, this.strikes)) {
                 this.index--;
                 this.calm = 0;
-                this.grace = 1;
+                this.grace = 3;
                 this.apply();
             }
         } else {

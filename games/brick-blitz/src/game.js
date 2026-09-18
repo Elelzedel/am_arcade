@@ -392,6 +392,16 @@ export default class BrickBlitz extends ArcadeGame {
 
     updatePaddle(dt) {
         const p = this.paddle;
+        // A touch host can set paddleTarget (in screen x): the paddle then
+        // chases the finger, fast but not instantly, instead of reading keys.
+        if (!this.demo && this.paddleTarget != null) {
+            p.v = clamp((this.paddleTarget - p.x) * 14, -PADDLE_MAX * 1.4, PADDLE_MAX * 1.4);
+            p.x += p.v * dt;
+            const half = p.w / 2;
+            if (p.x - half < FIELD.left) { p.x = FIELD.left + half; p.v = 0; }
+            if (p.x + half > FIELD.right) { p.x = FIELD.right - half; p.v = 0; }
+            return;
+        }
         let dir;
         if (this.demo) dir = this.ai.dir;
         else dir = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);

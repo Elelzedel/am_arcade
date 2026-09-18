@@ -690,7 +690,13 @@ export default class StarSwarm extends ArcadeGame {
             if (this.isDown('right')) mx += 1;
             if (this.isDown('up')) my -= 1;
             if (this.isDown('down')) my += 1;
-            fire = this.isDown('action') || this.fireQueued;
+            // A touch host can set moveTarget (screen coords): steer towards it,
+            // easing in over the last few pixels so the ship settles under the finger.
+            if (this.moveTarget) {
+                mx = Math.max(-1, Math.min(1, (this.moveTarget.x - p.x) / 36));
+                my = Math.max(-1, Math.min(1, (this.moveTarget.y - p.y) / 30));
+            }
+            fire = this.isDown('action') || this.fireQueued || !!this.autoFire;
         }
         this.fireQueued = false;
 

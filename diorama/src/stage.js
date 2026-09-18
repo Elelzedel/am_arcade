@@ -130,6 +130,10 @@ const FinalShader = {
     `,
 };
 
+// Phones and tablets: a coarse pointer on a smallish screen.
+export const MOBILE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
+    && Math.min(screen.width, screen.height) < 1100;
+
 // Quality tiers, best first. The governor in index.js walks down (and,
 // cautiously, back up) this list to keep frames under budget.
 //   dpr        most pixels per CSS pixel
@@ -143,6 +147,14 @@ export const TIERS = [
     { name: 'medium', dpr: 1.5, msaa: 2, bloom: 0.35, reflect: 0.35, reflectEvery: 2, shadows: 2, lampShadow: true, attract: 15 },
     { name: 'low', dpr: 1, msaa: 0, bloom: 0.3, reflect: 0.3, reflectEvery: 3, shadows: 3, lampShadow: false, attract: 10 },
     { name: 'potato', dpr: 0.75, msaa: 0, bloom: 0.25, reflect: 0, reflectEvery: 4, shadows: 6, lampShadow: false, attract: 6 },
+];
+
+// On phones the picture stays sharp: effects go long before pixels do, and
+// resolution never drops below 1.5x (a phone at 1x looks like smudged glasses).
+export const MOBILE_TIERS = [
+    { name: 'm-high', dpr: 2, msaa: 0, bloom: 0.3, reflect: 0.35, reflectEvery: 2, shadows: 2, lampShadow: false, attract: 12 },
+    { name: 'm-medium', dpr: 1.75, msaa: 0, bloom: 0.25, reflect: 0.25, reflectEvery: 3, shadows: 4, lampShadow: false, attract: 10 },
+    { name: 'm-low', dpr: 1.5, msaa: 0, bloom: 0.25, reflect: 0, reflectEvery: 4, shadows: 8, lampShadow: false, attract: 8 },
 ];
 
 const LEVELS = 5;
@@ -254,6 +266,6 @@ export function createStage() {
         },
     };
     window.addEventListener('resize', () => stage.resize());
-    stage.setTier(TIERS[0]);
+    stage.setTier(MOBILE ? MOBILE_TIERS[0] : TIERS[0]);
     return stage;
 }

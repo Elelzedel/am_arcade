@@ -158,15 +158,53 @@
       #help .credits { font-size: 12px; color: rgba(169,160,200,0.7); border-top: 1px solid var(--line); padding-top: 14px; display: flex; justify-content: space-between; }
       #help .close { position: absolute; }
 
-      /* ---- touch pad --------------------------------------------------------------- */
-      #pad { position: fixed; z-index: 25; inset: auto 0 18px 0; display: none; justify-content: space-between; padding: 0 22px; pointer-events: none; }
-      body.touch.playing #pad { display: flex; }
+      /* ---- touch controls (built by touch.js) --------------------------------------- */
+      #touch { position: fixed; inset: 0; z-index: 18; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: opacity 0.4s var(--ease); }
+      #touch .stick {
+        position: absolute; left: 0; top: 0; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%; pointer-events: none; opacity: 0;
+        background: radial-gradient(circle, rgba(255,255,255,0.04) 0 55%, rgba(255,255,255,0.1) 56% 100%);
+        box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c, #fff) 55%, transparent) inset, 0 0 24px color-mix(in srgb, var(--c, #fff) 25%, transparent);
+        transition: opacity 0.15s;
+      }
+      #touch .stick.on { opacity: 1; }
+      #touch .stick i {
+        position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55), color-mix(in srgb, var(--c, #fff) 45%, rgba(20,12,40,0.8)));
+        box-shadow: 0 0 18px color-mix(in srgb, var(--c, #fff) 60%, transparent);
+      }
+      #touch .buttons {
+        position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom));
+        display: grid; grid-template-columns: repeat(2, auto); gap: 12px; align-items: end; justify-items: center;
+      }
+      #touch .buttons button {
+        min-width: 74px; height: 50px; padding: 0 14px; border-radius: 16px; font-family: var(--pixel); font-size: 10px; letter-spacing: 0.5px; color: var(--ink);
+        background: rgba(18, 12, 38, 0.55); border: 1.5px solid color-mix(in srgb, var(--c, #fff) 55%, transparent);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform 0.08s, background 0.08s; touch-action: none;
+      }
+      #touch .buttons button.big {
+        grid-column: 1 / -1; order: 9; width: 96px; height: 96px; border-radius: 50%; font-size: 12px; border-width: 2px;
+        box-shadow: 0 0 22px color-mix(in srgb, var(--c, #fff) 35%, transparent), 0 0 0 6px rgba(255,255,255,0.04);
+      }
+      #touch .buttons[data-count="1"] { grid-template-columns: auto; }
+      #touch .buttons button.down { transform: scale(0.92); background: color-mix(in srgb, var(--c, #fff) 38%, rgba(18,12,38,0.7)); }
       body.touch.playing #controls { display: none; }
-      #pad .dpad { position: relative; width: 150px; height: 150px; pointer-events: auto; }
-      #pad .dpad button, #pad .ab button { position: absolute; width: 52px; height: 52px; border-radius: 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px); font-weight: 700; font-size: 16px; }
-      #pad .dpad button.down, #pad .ab button.down { background: rgba(255,255,255,0.3); }
-      #pad .ab { position: relative; width: 140px; height: 140px; pointer-events: auto; }
-      #pad .ab button { border-radius: 50%; width: 62px; height: 62px; }
+      /* on a phone the tube is the title; keep the top bar to one button */
+      body.touch.playing #gametitle, body.touch.playing #tools { display: none; }
+      body.touch #back kbd { display: none; }
+      body.touch #back { top: calc(14px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); }
+      #touch .hint {
+        position: absolute; left: calc(18px + env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); max-width: 52%;
+        font-size: 13px; line-height: 1.4; color: var(--muted); padding: 9px 13px; border-radius: 12px; pointer-events: none;
+        background: rgba(18, 12, 38, 0.55); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+      }
+      #touch .hint.gone { opacity: 0; transform: translateY(6px); }
+      @media (orientation: landscape) { #touch .hint { top: calc(70px + env(safe-area-inset-top)); bottom: auto; max-width: 18%; } }
+      body:not(.touch) #hint .touchonly, body.touch #hint .desk { display: none; }
+      #hint b { font-weight: inherit; }
+      body:not(.touch) #hint .touch-text, body.touch #hint .desk-text { display: none; }
+      body.touch #hint { gap: 10px; padding: 9px 14px; font-size: 12px; max-width: calc(100vw - 24px); bottom: calc(18px + env(safe-area-inset-bottom)); }
+      body:not(.touch) #touch { display: none; }
 
       @media (max-width: 720px) {
         #brand { top: 18px; left: 18px; }
@@ -208,7 +246,9 @@
     <div id="hint" class="hud hidden" inert>
       <span class="desk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v4M8 5l4-2 4 2M5 12h14M7 10l-2 2 2 2M17 10l2 2-2 2"/></svg>drag to look around</span><i class="desk"></i>
       <span class="desk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v3"/></svg>scroll to lean in</span><i class="desk"></i>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v9l-2-2-2 2 5 7h7l2-8-6-1V3z"/></svg>tap anything that glows</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v9l-2-2-2 2 5 7h7l2-8-6-1V3z"/></svg><b class="desk-text">tap anything that glows</b><b class="touch-text">tap what glows</b></span>
+      <i class="touchonly"></i><span class="touchonly"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v4M8 5l4-2 4 2M5 12h14M7 10l-2 2 2 2M17 10l2 2-2 2"/></svg>drag to spin</span><i class="touchonly"></i>
+      <span class="touchonly">pinch to zoom</span>
     </div>
     <div id="walkhint" class="hud hidden" inert>
       <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>walk</span><i></i>
@@ -224,19 +264,6 @@
     <button id="back" class="hud hidden" inert><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Step back <kbd>ESC</kbd></button>
     <div id="gametitle" class="hud hidden" inert><div class="t"></div><div class="s"></div></div>
     <div id="controls" class="hud hidden" inert></div>
-    <div id="pad">
-      <div class="dpad">
-        <button data-key="ArrowUp" style="left:49px;top:0">▲</button>
-        <button data-key="ArrowLeft" style="left:0;top:49px">◀</button>
-        <button data-key="ArrowRight" style="left:98px;top:49px">▶</button>
-        <button data-key="ArrowDown" style="left:49px;top:98px">▼</button>
-      </div>
-      <div class="ab">
-        <button data-key="KeyX" style="left:0;top:60px">B</button>
-        <button data-key="Space" style="left:72px;top:18px">A</button>
-      </div>
-    </div>
-
     <div id="toast"></div>
 
     <div id="help" class="hidden" inert>

@@ -1,5 +1,5 @@
 // The DOM layer: title card, the small overview HUD, the hover label, the
-// in-game chrome and the touch pad. The markup lives in index.html.
+// in-game chrome. Touch controls live in touch.js. The markup lives in index.html.
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,7 +11,7 @@ export default class Interface {
             brand: $('brand'), clock: $('clock'), tools: $('tools'), sound: $('sound'), helpBtn: $('helpBtn'), help: $('help'),
             hint: $('hint'), nowplaying: $('nowplaying'), npTitle: $('npTitle'), npArtist: $('npArtist'),
             view: $('view'), walkhint: $('walkhint'), crosshair: $('crosshair'),
-            label: $('label'), back: $('back'), gametitle: $('gametitle'), controls: $('controls'), toast: $('toast'), pad: $('pad'),
+            label: $('label'), back: $('back'), gametitle: $('gametitle'), controls: $('controls'), toast: $('toast'),
         };
         this.isReady = false;
         this.muted = false;
@@ -22,7 +22,6 @@ export default class Interface {
         this.onEnter = null;
         this.onBack = null;
         this.onMute = null;
-        this.onPad = null;
 
         this.el.enter.addEventListener('click', () => this.onEnter?.());
         this.el.back.addEventListener('click', () => this.onBack?.());
@@ -34,20 +33,6 @@ export default class Interface {
 
         const touch = matchMedia('(pointer: coarse)').matches;
         document.body.classList.toggle('touch', touch);
-        if (touch) {
-            for (const b of this.el.pad.querySelectorAll('button')) {
-                const code = b.dataset.key;
-                const set = (down) => (e) => {
-                    e.preventDefault();
-                    b.classList.toggle('down', down);
-                    this.onPad?.(code, down);
-                };
-                b.addEventListener('pointerdown', set(true));
-                b.addEventListener('pointerup', set(false));
-                b.addEventListener('pointercancel', set(false));
-                b.addEventListener('pointerleave', set(false));
-            }
-        }
         this.updateClock();
     }
 

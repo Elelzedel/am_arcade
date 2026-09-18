@@ -292,7 +292,7 @@ function coinTexture(livery) {
 const screenGeo = new THREE.PlaneGeometry(SCREEN_W, SCREEN_H);
 
 export default class Cabinet {
-    constructor({ GameClass, position, rotationY }) {
+    constructor({ GameClass, position, rotationY, gameOptions = {} }) {
         this.GameClass = GameClass;
         this.meta = GameClass.meta;
         this.livery = LIVERY[this.meta.id];
@@ -307,7 +307,7 @@ export default class Cabinet {
         this.canvas = document.createElement('canvas');
         this.canvas.width = 800;
         this.canvas.height = 600;
-        this.game = new GameClass(this.canvas, { attractPrompt: 'CLICK TO PLAY', leaveHint: 'ESC LEAVE' });
+        this.game = new GameClass(this.canvas, { attractPrompt: 'CLICK TO PLAY', leaveHint: 'ESC LEAVE', ...gameOptions });
         this.game.setVolume(0);
 
         this.power = 0;       // 0..1, driven by the ignition sequence
@@ -500,19 +500,38 @@ export default class Cabinet {
     // ---- camera -----------------------------------------------------------------
 
     /** Pose that frames the screen for play, sized to the viewport. */
-    playPose(aspect) {
+    /**
+     * Pose that frames the screen for play. `top` and `bottom` are fractions
+     * of the viewport's height kept clear for the interface (on a phone, the
+     * bottom holds the thumbs' controls): the tube is fitted into what's left
+     * and centred in it.
+     */
+    playPose(aspect, { top = 0, bottom = 0, margin = 1.12 } = {}) {
         this.group.updateMatrixWorld(true);
         const center = new THREE.Vector3();
         this.screen.getWorldPosition(center);
-        const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(this.screen.getWorldQuaternion(new THREE.Quaternion()));
+        const quat = this.screen.getWorldQuaternion(new THREE.Quaternion());
+        const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
         const fov = 34;
-        const vfov = THREE.MathUtils.degToRad(fov);
-        // fit the tube (plus a sliver of bezel) in both directions
-        // leave room for the interface above and below the tube
-        const fitH = (SCREEN_H * 1.26) / 2 / Math.tan(vfov / 2);
-        const fitW = (SCREEN_W * 1.12) / 2 / (Math.tan(vfov / 2) * aspect);
+        const tan = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
+        const free = Math.max(0.3, 1 - top - bottom);
+        const fitH = (SCREEN_H * margin) / 2 / (tan * free);
+        const fitW = (SCREEN_W * margin) / 2 / (tan * aspect);
         const distance = Math.max(fitH, fitW);
-        return { position: center.clone().addScaledVector(normal, distance), target: center, fov };
+        // slide the view so the tube sits in the middle of the free band
+        const shift = (bottom - top) * distance * tan;
+        const offset = up.multiplyScalar(-shift);
+        return { position: center.clone().addScaledVector(normal, distance).add(offset), target: center.clone().add(offset), fov };
+    }
+
+    /** Where the tube is on screen, in CSS pixels (for touch controls). */
+    screenRect(camera) {
+        const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => new THREE.Vector3(x * SCREEN_W / 2, y * SCREEN_H / 2, 0).applyMatrix4(this.screen.matrixWorld).project(camera));
+        const xs = corners.map((v) => (v.x + 1) / 2 * window.innerWidth);
+        const ys = corners.map((v) => (1 - v.y) / 2 * window.innerHeight);
+        const left = Math.min(...xs), top = Math.min(...ys);
+        return { left, top, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
     }
 
     /** A closer look from the overview, used as a waypoint. */

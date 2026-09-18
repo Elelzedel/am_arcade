@@ -48,7 +48,7 @@ export default class ArcadeGame {
         controls: [],
     };
 
-    constructor(canvas, { standalone = false, attractPrompt = 'PRESS E TO PLAY', leaveHint = 'Q LEAVE CABINET' } = {}) {
+    constructor(canvas, { standalone = false, attractPrompt = 'PRESS E TO PLAY', leaveHint = 'Q LEAVE CABINET', prompts = {}, controls = null } = {}) {
         this.canvas = canvas;
         this.canvas.width = SCREEN_WIDTH;
         this.canvas.height = SCREEN_HEIGHT;
@@ -58,6 +58,10 @@ export default class ArcadeGame {
         this.standalone = standalone;
         this.attractPrompt = attractPrompt;
         this.leaveHint = leaveHint;
+        // what the screens tell the player to press; a touch host swaps in taps
+        this.prompts = { start: 'PRESS SPACE TO START', next: 'PRESS SPACE', initials: 'UP/DOWN CHANGE  SPACE NEXT', footer: null, ...prompts };
+        // the title screen's control list (defaults to meta.controls)
+        this.controlList = controls;
 
         this.meta = this.constructor.meta;
         this.sounds = new SoundBank();
@@ -376,7 +380,7 @@ export default class ArcadeGame {
         drawText(ctx, `HI ${formatScore(this.highScores.top)}`, this.width / 2, 30, { size: 16, color: '#ffe066' });
 
         y += 20;
-        const controls = this.meta.controls || [];
+        const controls = this.controlList || this.meta.controls || [];
         if (controls.length) {
             const panelH = controls.length * 30 + 30;
             drawPanel(ctx, 140, y, 520, panelH, { stroke: this.meta.color, glow: 12 });
@@ -391,9 +395,9 @@ export default class ArcadeGame {
         this.renderTitleExtras(ctx, y);
 
         if (blink(this.time, 1)) {
-            drawText(ctx, 'PRESS SPACE TO START', this.width / 2, this.height - 80, { size: 22, color: '#ffffff', glow: 12 });
+            drawText(ctx, this.prompts.start, this.width / 2, this.height - 80, { size: 22, color: '#ffffff', glow: 12 });
         }
-        drawText(ctx, this.standalone ? 'P PAUSE' : `P PAUSE   ${this.leaveHint}`, this.width / 2, this.height - 36, { size: 11, color: '#8888aa' });
+        drawText(ctx, this.prompts.footer ?? (this.standalone ? 'P PAUSE' : `P PAUSE   ${this.leaveHint}`), this.width / 2, this.height - 36, { size: 11, color: '#8888aa' });
     }
 
     renderPaused(ctx) {
@@ -442,14 +446,14 @@ export default class ArcadeGame {
                 drawText(ctx, '▼', x, 400, { size: 14, color: this.meta.color, shadow: false });
             }
         }
-        drawText(ctx, 'UP/DOWN CHANGE  SPACE NEXT', this.width / 2, 480, { size: 12, color: '#aaaacc' });
+        drawText(ctx, this.prompts.initials, this.width / 2, 480, { size: 12, color: '#aaaacc' });
     }
 
     renderScores(ctx) {
         dimScreen(ctx, this.width, this.height, 0.85);
         this.renderScoreTable(ctx, 130, this.newRank);
         if (this.stateTime > 0.5 && blink(this.time, 1)) {
-            drawText(ctx, 'PRESS SPACE', this.width / 2, this.height - 60, { size: 16 });
+            drawText(ctx, this.prompts.next, this.width / 2, this.height - 60, { size: 16 });
         }
     }
 

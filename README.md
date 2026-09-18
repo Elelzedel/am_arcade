@@ -37,7 +37,12 @@ npm run build    # production build in dist/
 | click the prize wall | something wiggles; the big bear is 10,000 tickets |
 | `M` | sound on / off |
 
-On touch screens a d-pad and A/B buttons appear while you're playing.
+On phones every game has its own touch controls: a floating joystick with
+FIRE / WEAPON / DRIVE for Tank Artillery, joystick + BOOST for Neon Racer,
+drag-to-fly with auto-fire for Star Swarm, a paddle that follows your finger
+(tap to launch) for Brick Blitz, and swipe-to-turn + DASH for Neon Snake.
+Between games, tap to go on and swipe to pick your initials. Drag spins the
+corner, pinch zooms. (First person is desktop-only.)
 
 ## The machines
 
@@ -64,6 +69,7 @@ diorama/
   src/walker.js         first person: walking, looking, collisions
   src/interaction.js    hover/click picking with springy feedback
   src/ui.js             DOM layer: loader, labels, toasts, in-game chrome
+  src/touch.js          phone controls: per-game schemes, joystick, gestures
   src/power.js          the ignition sequence every light registers with
   src/batch.js          merges everything static into a few draw calls
   src/palette.js        every colour in the scene, and each machine's livery
@@ -87,6 +93,7 @@ The helpers in `scripts/` drive the real app in headless Chromium.
 node scripts/look.mjs /tmp/overview.png "http://localhost:8080/?skip"    # one screenshot
 node scripts/closeups.mjs /tmp/cu cat jukebox sign                      # fixed close-up poses
 node scripts/interact.mjs /tmp/it                                       # real mouse: hover, click every toy, drag, zoom, play
+node scripts/phone.mjs /tmp/ph portrait steps.json                        # iPhone-sized, real touch events (PHONE_CPU=4 to throttle)
 node scripts/shot.mjs "http://localhost:8080/brick-blitz.html?autostart" /tmp/bb
 ```
 
@@ -106,6 +113,10 @@ frame rates.
   machines redraw. A governor starts from the tier that last held up on the
   machine (remembered in localStorage), steps down when frames run long and,
   cautiously, back up when there's room.
+- **Phones** get their own tiers (`MOBILE_TIERS`): effects are shed first
+  (reflections, shadow redraw rate, bloom size) and resolution never drops
+  below 1.5x. The governor only judges once you're exploring, on the median
+  frame, so loading hitches don't push a phone into a blurry tier.
 - **Five lights**: moon, the room's overhead spot, the street lamp, the car's
   headlight and a hemisphere fill. Everything else that seems to glow on the
   floor (the machines, jukebox, vending machine) is a painted light pool.
