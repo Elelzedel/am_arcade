@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>AM Arcade — open 'til 4</title>
+    <meta name="description" content="A tiny arcade on a rainy street corner, open all night. Wander round it, then step up to a machine and play.">
+    <style>
+      :root {
+        --void: #07051a;
+        --ink: #f4ecff;
+        --muted: #a9a0c8;
+        --pink: #ff4fa8;
+        --cyan: #48f0ff;
+        --amber: #ffb347;
+        --glass: rgba(18, 12, 38, 0.62);
+        --line: rgba(255, 255, 255, 0.12);
+        --ui: "Bricolage Grotesque", system-ui, sans-serif;
+        --script: "Yellowtail", cursive;
+        --neon: "Monoton", sans-serif;
+        --pixel: "Press Start 2P", monospace;
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: var(--void); color: var(--ink); font-family: var(--ui); -webkit-font-smoothing: antialiased; }
+      canvas.world { position: fixed; inset: 0; display: block; outline: none; touch-action: none; }
+      body.hovering canvas.world { cursor: pointer; }
+      body.dragging canvas.world { cursor: grabbing; }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+      .hidden { opacity: 0 !important; pointer-events: none !important; }
+      kbd { font-family: var(--pixel); font-size: 9px; letter-spacing: 0.5px; display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-bottom-width: 2px; color: var(--ink); }
+
+      /* ---- loader / title card ------------------------------------------------ */
+      #loader {
+        position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; text-align: center;
+        background: radial-gradient(ellipse 80% 70% at 50% 55%, rgba(7,5,26,0.2) 0%, rgba(7,5,26,0.72) 60%, rgba(7,5,26,0.95) 100%);
+        transition: opacity 1.4s var(--ease), backdrop-filter 1.4s;
+      }
+      #loader.solid { background: var(--void); }
+      #loader .card { position: absolute; top: 11vh; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 0; }
+      #loader.solid .card { top: 50%; transform: translateY(-60%); }
+      #loader .card { transition: top 1.2s var(--ease), transform 1.2s var(--ease); }
+      #loader .eyebrow { font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; opacity: 0; animation: rise 1.2s 0.2s var(--ease) forwards; }
+      #loader h1 {
+        margin: 0; font-family: var(--neon); font-weight: 400; font-size: clamp(54px, 10vw, 150px); line-height: 0.9; letter-spacing: 0.02em;
+        color: #ffe3f3; text-shadow: 0 0 6px #ff4fa8, 0 0 22px #ff4fa8, 0 0 60px rgba(255,79,168,0.55);
+        opacity: 0; animation: ignite 2.2s 0.4s steps(1) forwards;
+      }
+      #loader h1 span { color: #e3fdff; text-shadow: 0 0 6px #48f0ff, 0 0 22px #48f0ff, 0 0 60px rgba(72,240,255,0.5); }
+      #loader .script { font-family: var(--script); font-size: clamp(26px, 3.2vw, 42px); color: #ffd9a3; text-shadow: 0 0 14px rgba(255,179,71,0.7); margin-top: 6px; opacity: 0; animation: rise 1.4s 1.2s var(--ease) forwards; }
+      #loader .progress { margin-top: 42px; width: 220px; height: 2px; border-radius: 2px; background: rgba(255,255,255,0.1); overflow: hidden; transition: opacity 0.5s; }
+      #loader .progress i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--pink), var(--cyan)); box-shadow: 0 0 12px var(--pink); transition: width 0.3s var(--ease); }
+      #loader .status { margin-top: 14px; font-size: 13px; color: var(--muted); letter-spacing: 0.04em; min-height: 18px; transition: opacity 0.4s; }
+      #enter {
+        position: fixed; bottom: 11vh; left: 50%; translate: -50% 0; padding: 16px 34px 17px; border-radius: 999px; font-size: 16px; font-weight: 600; letter-spacing: 0.06em;
+        color: #1a0b1e; background: linear-gradient(180deg, #fff3e2, #ffd9b0); box-shadow: 0 0 0 1px rgba(255,255,255,0.4) inset, 0 10px 40px rgba(255,120,180,0.35), 0 0 80px rgba(255,79,168,0.25);
+        transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), opacity 0.6s; display: inline-flex; align-items: center; gap: 12px;
+      }
+      #enter:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 0 0 1px rgba(255,255,255,0.5) inset, 0 16px 50px rgba(255,120,180,0.5), 0 0 110px rgba(255,79,168,0.35); }
+      #enter:active { transform: translateY(1px) scale(0.99); }
+      #enter .coin { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6c9, #ffc34d 55%, #c77d12); box-shadow: 0 0 0 2px rgba(0,0,0,0.12) inset; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #7a4a06; }
+      #loader .fine { position: absolute; bottom: 28px; left: 0; right: 0; font-size: 12px; color: rgba(169,160,200,0.7); letter-spacing: 0.05em; }
+      @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @keyframes ignite { 0% { opacity: 0; } 8% { opacity: 1; } 11% { opacity: 0.1; } 16% { opacity: 1; } 19% { opacity: 0.3; } 24%, 100% { opacity: 1; } }
+
+      /* ---- overview HUD ----------------------------------------------------------- */
+      .hud { position: fixed; z-index: 20; transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+      #brand { top: 26px; left: 30px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
+      #brand .name { font-family: var(--neon); font-size: 22px; letter-spacing: 0.04em; color: #ffe3f3; text-shadow: 0 0 10px rgba(255,79,168,0.8); }
+      #brand .sub { font-size: 12.5px; color: var(--muted); letter-spacing: 0.04em; }
+      #brand .sub b { color: #ffd9a3; font-weight: 600; }
+      #tools { top: 22px; right: 24px; display: flex; gap: 10px; }
+      .tool {
+        width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line);
+        backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background 0.25s, transform 0.25s var(--ease), border-color 0.25s;
+      }
+      .tool:hover { background: rgba(40, 26, 80, 0.8); border-color: rgba(255,255,255,0.3); transform: scale(1.06); }
+      .tool svg { width: 18px; height: 18px; }
+      .bars { display: flex; gap: 2.5px; align-items: flex-end; height: 14px; }
+      .bars i { width: 3px; border-radius: 2px; background: var(--ink); height: 4px; transition: height 0.2s; }
+      .bars.on i { animation: bar 0.9s ease-in-out infinite; }
+      .bars.on i:nth-child(2) { animation-delay: -0.3s; } .bars.on i:nth-child(3) { animation-delay: -0.6s; } .bars.on i:nth-child(4) { animation-delay: -0.15s; }
+      @keyframes bar { 0%, 100% { height: 4px; } 50% { height: 14px; } }
+      #hint {
+        bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; align-items: center; padding: 11px 18px; border-radius: 999px;
+        background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 13px; color: var(--muted); white-space: nowrap; pointer-events: none;
+      }
+      #hint span { display: inline-flex; gap: 7px; align-items: center; }
+      #hint svg { width: 15px; height: 15px; opacity: 0.85; }
+      #hint i { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.25); }
+      #nowplaying { bottom: 30px; left: 30px; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); pointer-events: none; }
+      #nowplaying .disc { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle, var(--c, #ff4fa8) 0 28%, #120c18 30% 100%); box-shadow: 0 0 0 1px rgba(255,255,255,0.12); animation: spin 1.8s linear infinite; }
+      #nowplaying b { color: var(--ink); font-weight: 600; display: block; font-size: 13.5px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ---- hover label ------------------------------------------------------------ */
+      #label {
+        position: fixed; z-index: 30; left: 0; top: 0; pointer-events: none; padding: 10px 14px 11px; border-radius: 12px; min-width: 150px;
+        background: rgba(14, 9, 30, 0.78); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.2); transform-origin: 0 0; transition: opacity 0.18s, transform 0.25s var(--ease);
+      }
+      #label.hidden { transform: scale(0.94); }
+      #label .title { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; letter-spacing: 0.01em; }
+      #label .title i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #fff); box-shadow: 0 0 10px var(--c, #fff); flex: none; }
+      #label .sub { margin-top: 3px; font-size: 12.5px; color: var(--muted); padding-left: 16px; }
+      #label .sub b { color: var(--c, #fff); font-weight: 600; }
+
+      /* ---- playing ---------------------------------------------------------------- */
+      #back {
+        top: 22px; left: 24px; display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px 10px 12px; border-radius: 999px; font-size: 14px; font-weight: 600;
+        background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background 0.25s, transform 0.3s var(--ease), opacity 0.5s;
+      }
+      #back:hover { background: rgba(40, 26, 80, 0.85); transform: translateX(-2px); }
+      #back svg { width: 16px; height: 16px; }
+      #back kbd { margin-left: 4px; }
+      #controls {
+        bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; align-items: center; padding: 10px 16px; border-radius: 14px; font-size: 12.5px; color: var(--muted);
+        background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); white-space: nowrap; pointer-events: none;
+      }
+      #controls span { display: inline-flex; gap: 8px; align-items: center; }
+      #gametitle { top: 30px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
+      #gametitle .t { font-family: var(--pixel); font-size: 12px; color: var(--c, #fff); text-shadow: 0 0 10px var(--c, #fff); letter-spacing: 1px; }
+      #gametitle .s { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+
+      /* ---- toast ------------------------------------------------------------------ */
+      #toast {
+        position: fixed; z-index: 40; left: 50%; bottom: 92px; transform: translate(-50%, 10px); padding: 11px 18px; border-radius: 999px; font-size: 14px;
+        background: rgba(255, 244, 230, 0.95); color: #1d0f24; font-weight: 550; box-shadow: 0 10px 30px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s, transform 0.4s var(--ease); pointer-events: none; white-space: nowrap;
+      }
+      #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+      /* ---- help ------------------------------------------------------------------- */
+      #help { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgba(7,5,26,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: opacity 0.4s var(--ease); }
+      #help .panel { width: min(460px, calc(100vw - 40px)); padding: 30px 32px 26px; border-radius: 22px; background: rgba(18, 12, 38, 0.92); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,0.5); transform: translateY(0); transition: transform 0.5s var(--ease); }
+      #help.hidden .panel { transform: translateY(14px); }
+      #help h2 { margin: 0; font-family: var(--script); font-weight: 400; font-size: 40px; color: #ffd9a3; text-shadow: 0 0 16px rgba(255,179,71,0.5); }
+      #help p { color: var(--muted); font-size: 14.5px; line-height: 1.6; margin: 8px 0 20px; }
+      #help dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; margin: 0 0 22px; font-size: 13.5px; align-items: center; }
+      #help dt { display: flex; gap: 5px; justify-content: flex-end; }
+      #help dd { margin: 0; color: var(--ink); }
+      #help .credits { font-size: 12px; color: rgba(169,160,200,0.7); border-top: 1px solid var(--line); padding-top: 14px; display: flex; justify-content: space-between; }
+      #help .close { position: absolute; }
+
+      /* ---- touch pad --------------------------------------------------------------- */
+      #pad { position: fixed; z-index: 25; inset: auto 0 18px 0; display: none; justify-content: space-between; padding: 0 22px; pointer-events: none; }
+      body.touch.playing #pad { display: flex; }
+      body.touch.playing #controls { display: none; }
+      #pad .dpad { position: relative; width: 150px; height: 150px; pointer-events: auto; }
+      #pad .dpad button, #pad .ab button { position: absolute; width: 52px; height: 52px; border-radius: 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px); font-weight: 700; font-size: 16px; }
+      #pad .dpad button.down, #pad .ab button.down { background: rgba(255,255,255,0.3); }
+      #pad .ab { position: relative; width: 140px; height: 140px; pointer-events: auto; }
+      #pad .ab button { border-radius: 50%; width: 62px; height: 62px; }
+
+      @media (max-width: 720px) {
+        #brand { top: 18px; left: 18px; }
+        #brand .name { font-size: 17px; }
+        #tools { top: 14px; right: 14px; }
+        #hint { font-size: 12px; bottom: 20px; gap: 12px; padding: 9px 14px; }
+        #hint .desk { display: none; }
+        #nowplaying { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #loader h1 { animation: none; opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loader" class="solid">
+      <div class="card">
+        <div class="eyebrow">a little arcade on the corner</div>
+        <h1>AM <span>ARCADE</span></h1>
+        <div class="script">open 'til four</div>
+        <div class="progress"><i></i></div>
+        <div class="status">sweeping the floor&hellip;</div>
+        <button id="enter" class="hidden"><span class="coin">¢</span>Step inside</button>
+      </div>
+      <div class="fine">best with sound &nbsp;·&nbsp; headphones on</div>
+    </div>
+
+    <div id="brand" class="hud hidden">
+      <div class="name">AM ARCADE</div>
+      <div class="sub">open 'til four &nbsp;·&nbsp; it's <b id="clock">2:00 AM</b></div>
+    </div>
+    <div id="tools" class="hud hidden">
+      <button class="tool" id="sound" aria-label="Toggle sound"><div class="bars on"><i></i><i></i><i></i><i></i></div></button>
+      <button class="tool" id="helpBtn" aria-label="About and controls">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.3"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <div id="hint" class="hud hidden">
+      <span class="desk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v4M8 5l4-2 4 2M5 12h14M7 10l-2 2 2 2M17 10l2 2-2 2"/></svg>drag to look around</span><i class="desk"></i>
+      <span class="desk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v3"/></svg>scroll to lean in</span><i class="desk"></i>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v9l-2-2-2 2 5 7h7l2-8-6-1V3z"/></svg>tap anything that glows</span>
+    </div>
+    <div id="nowplaying" class="hud hidden"><div class="disc"></div><div><b id="npTitle">Night Shift</b><span id="npArtist">the Tokens</span></div></div>
+
+    <div id="label" class="hidden"><div class="title"><i></i><span></span></div><div class="sub"></div></div>
+
+    <button id="back" class="hud hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Step back <kbd>ESC</kbd></button>
+    <div id="gametitle" class="hud hidden"><div class="t"></div><div class="s"></div></div>
+    <div id="controls" class="hud hidden"></div>
+    <div id="pad">
+      <div class="dpad">
+        <button data-key="ArrowUp" style="left:49px;top:0">▲</button>
+        <button data-key="ArrowLeft" style="left:0;top:49px">◀</button>
+        <button data-key="ArrowRight" style="left:98px;top:49px">▶</button>
+        <button data-key="ArrowDown" style="left:49px;top:98px">▼</button>
+      </div>
+      <div class="ab">
+        <button data-key="KeyX" style="left:0;top:60px">B</button>
+        <button data-key="Space" style="left:72px;top:18px">A</button>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <div id="help" class="hidden">
+      <div class="panel">
+        <h2>Welcome in</h2>
+        <p>It's late, it's raining, and the arcade on the corner is still open. Wander round it, poke at whatever glows, and when a machine catches your eye, click it to step up and play.</p>
+        <dl>
+          <dt><kbd>DRAG</kbd></dt><dd>swing round the corner</dd>
+          <dt><kbd>SCROLL</kbd></dt><dd>lean in, lean out</dd>
+          <dt><kbd>CLICK</kbd></dt><dd>play a machine, pet the cat, feed the jukebox</dd>
+          <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>walk straight up to a machine</dd>
+          <dt><kbd>ESC</kbd></dt><dd>step back from a machine</dd>
+          <dt><kbd>M</kbd></dt><dd>sound on / off</dd>
+        </dl>
+        <div class="credits"><span>Made by ajclausen &amp; Elelzedel</span><span>all sound &amp; light synthesized</span></div>
+      </div>
+    </div>
+  </body>
+</html>

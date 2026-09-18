@@ -1,0 +1,83 @@
+import * as THREE from 'three';
+import { P } from '../palette.js';
+
+// The night the diorama floats in: a screen-space glow that always sits
+// behind the model (so it reads as a spotlight on a stage, from any angle),
+// sparse stars that stay put in the world as the camera swings, and a slow
+// drift of haze.
+export function createVoid(scene) {
+    const material = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+            time: { value: 0 },
+            resolution: { value: new THREE.Vector2(1, 1) },
+            deep: { value: new THREE.Color(P.voidDeep) },
+            mid: { value: new THREE.Color(P.voidMid) },
+            glow: { value: new THREE.Color(P.voidGlow) },
+            focus: { value: new THREE.Vector2(0.5, 0.52) },
+            power: { value: 0 },
+        },
+        vertexShader: /* glsl */`
+            varying vec3 vDir;
+            void main() {
+                vDir = normalize(position);
+                vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                gl_Position = p.xyww;
+            }
+        `,
+        fragmentShader: /* glsl */`
+            uniform float time, power;
+            uniform vec2 resolution, focus;
+            uniform vec3 deep, mid, glow;
+            varying vec3 vDir;
+
+            float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+            float noise(vec2 p) {
+                vec2 i = floor(p), f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = fract(sin(dot(i, vec2(12.9898, 78.233))) * 43758.5453);
+                float b = fract(sin(dot(i + vec2(1, 0), vec2(12.9898, 78.233))) * 43758.5453);
+                float c = fract(sin(dot(i + vec2(0, 1), vec2(12.9898, 78.233))) * 43758.5453);
+                float d = fract(sin(dot(i + vec2(1, 1), vec2(12.9898, 78.233))) * 43758.5453);
+                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            }
+
+            void main() {
+                vec2 uv = gl_FragCoord.xy / resolution;
+                vec2 d = (uv - focus) * vec2(resolution.x / resolution.y, 1.0);
+                float r = length(d);
+                vec3 col = mix(glow, mid, smoothstep(0.0, 0.55, r));
+                col = mix(col, deep, smoothstep(0.35, 1.15, r));
+
+                // drifting haze
+                float h = noise(d * 2.2 + vec2(time * 0.012, -time * 0.008));
+                h += 0.5 * noise(d * 5.0 - vec2(time * 0.02, 0.0));
+                col += glow * (h - 0.75) * 0.08;
+
+                // stars, fixed to the world
+                vec3 cell = floor(vDir * 180.0);
+                float s = hash(cell);
+                float star = step(0.9965, s);
+                vec3 f = fract(vDir * 180.0) - 0.5;
+                float tw = 0.6 + 0.4 * sin(time * (1.0 + s * 3.0) + s * 40.0);
+                col += vec3(0.8, 0.8, 1.0) * star * smoothstep(0.35, 0.0, length(f)) * tw * 0.55 * smoothstep(0.25, 0.8, r);
+
+                gl_FragColor = vec4(col * mix(0.55, 1.0, power), 1.0);
+            }
+        `,
+    });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 16), material);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = -10;
+    scene.add(mesh);
+    return {
+        mesh,
+        material,
+        update(time, width, height, power) {
+            material.uniforms.time.value = time;
+            material.uniforms.resolution.value.set(width, height);
+            material.uniforms.power.value = power;
+        },
+    };
+}

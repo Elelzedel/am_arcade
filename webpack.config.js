@@ -7,7 +7,7 @@ const GAMES = ['tank-game', 'neon-racer', 'brick-blitz', 'star-swarm', 'neon-sna
 module.exports = (env, argv) => ({
   mode: argv.mode || 'development',
   entry: {
-    arcade: './arcade-environment/src/index.js',
+    arcade: './diorama/src/index.js',
     ...Object.fromEntries(GAMES.map((game) => [game, `./games/${game}/src/standalone.js`])),
   },
   output: {
@@ -60,7 +60,7 @@ module.exports = (env, argv) => ({
   plugins: [
     new HtmlWebpackPlugin({
       filename: 'index.html',
-      template: './arcade-environment/index.html',
+      template: './diorama/index.html',
       chunks: ['arcade'],
     }),
     ...GAMES.map((game) => new HtmlWebpackPlugin({

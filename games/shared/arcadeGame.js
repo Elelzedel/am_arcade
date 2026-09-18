@@ -48,7 +48,7 @@ export default class ArcadeGame {
         controls: [],
     };
 
-    constructor(canvas, { standalone = false } = {}) {
+    constructor(canvas, { standalone = false, attractPrompt = 'PRESS E TO PLAY', leaveHint = 'Q LEAVE CABINET' } = {}) {
         this.canvas = canvas;
         this.canvas.width = SCREEN_WIDTH;
         this.canvas.height = SCREEN_HEIGHT;
@@ -56,6 +56,8 @@ export default class ArcadeGame {
         this.width = SCREEN_WIDTH;
         this.height = SCREEN_HEIGHT;
         this.standalone = standalone;
+        this.attractPrompt = attractPrompt;
+        this.leaveHint = leaveHint;
 
         this.meta = this.constructor.meta;
         this.sounds = new SoundBank();
@@ -363,7 +365,7 @@ export default class ArcadeGame {
         }
         drawText(ctx, `HI ${formatScore(this.highScores.top)}`, this.width / 2, 30, { size: 16, color: '#ffe066' });
         if (blink(this.time, 1.2)) {
-            drawText(ctx, 'PRESS E TO PLAY', this.width / 2, this.height - 70, { size: 22, color: '#ffffff', glow: 10 });
+            drawText(ctx, this.attractPrompt, this.width / 2, this.height - 70, { size: 22, color: '#ffffff', glow: 10 });
         }
         drawText(ctx, 'FREE PLAY', this.width / 2, this.height - 30, { size: 12, color: '#8888aa' });
     }
@@ -391,7 +393,7 @@ export default class ArcadeGame {
         if (blink(this.time, 1)) {
             drawText(ctx, 'PRESS SPACE TO START', this.width / 2, this.height - 80, { size: 22, color: '#ffffff', glow: 12 });
         }
-        drawText(ctx, this.standalone ? 'P PAUSE' : 'P PAUSE   Q LEAVE CABINET', this.width / 2, this.height - 36, { size: 11, color: '#8888aa' });
+        drawText(ctx, this.standalone ? 'P PAUSE' : `P PAUSE   ${this.leaveHint}`, this.width / 2, this.height - 36, { size: 11, color: '#8888aa' });
     }
 
     renderPaused(ctx) {
