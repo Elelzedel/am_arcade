@@ -1,13 +1,13 @@
 # AM Arcade 🕹️
 
-A 3D arcade you can walk around in your browser. Stroll across the blacklight
-carpet, walk up to a cabinet, press **E**, and the camera glides into the
-screen so you can actually play. Every machine runs its own game, plays an
-attract-mode demo when nobody's using it, and keeps a high-score table (with
-three-letter initials, naturally).
+A little arcade on a rainy street corner, open 'til four. The whole corner is
+a hand-built diorama floating in the dark: swing round it, lean in, poke at
+whatever glows, and when a machine catches your eye, click it and the camera
+glides into the screen so you can actually play.
 
-Built with Three.js, the Canvas API and WebAudio. No image or audio assets:
-textures and sounds are generated at runtime.
+Everything is made in code: the models are built from Three.js primitives,
+the textures are painted on canvases at load, and every sound (the rain, the
+jukebox's records, the cat) is synthesized with WebAudio.
 
 ## Quick start
 
@@ -17,29 +17,22 @@ npm run dev      # opens http://localhost:8080
 npm run build    # production build in dist/
 ```
 
-## Controls
+## Things to do there
 
-| In the arcade | |
+| | |
 | --- | --- |
-| `W A S D` / arrows | walk |
-| mouse | look around |
-| `Shift` | run |
-| `E` / `Enter` | play the machine you're facing |
-| `Esc` | pause (release the mouse) |
+| drag | swing round the corner |
+| scroll / pinch | lean in, lean out |
+| click a cabinet (or `1`–`5`) | step up and play; `Esc` steps back |
+| click the cat | Pixel is asleep on the prize counter. For now. |
+| click the jukebox | drop a record: four lo-fi pieces for 2 AM |
+| click the vending machine | 75¢, and a can clunks into the tray |
+| click the rocket | a 25¢ ride that goes nowhere, enthusiastically |
+| click the bin | somebody lives in there |
+| click the car | it's just trying to get home; honk anyway |
+| `M` | sound on / off |
 
-| At a machine | |
-| --- | --- |
-| `Space` | start / primary action |
-| arrows / `W A S D` | move |
-| `P` | pause the game |
-| `Q` / `Backspace` | step away from the machine |
-
-The cabinets aren't the only things you can use: the **prize crane** by the
-entrance is a real claw game (arrows drive the claw, `Space` drops it, and the
-plushes you win line up on top of the machine and are remembered between
-visits), and the **Wurli-Tone 3000** jukebox on the left wall sets the arcade's
-music — browse with the arrows, `Space` to play. The neon trim breathes along
-with whatever is on the jukebox.
+On touch screens a d-pad and A/B buttons appear while you're playing.
 
 ## The machines
 
@@ -51,92 +44,61 @@ with whatever is on the jukebox.
 | **Brick Blitz** | Arkanoid-style brick breaker with metal/gold/explosive bricks, power-up capsules and handcrafted rounds. |
 | **Neon Snake** | Snake with mazes, portals, combos, bonus gems and a dash. |
 
-Each game can also be played on its own page, e.g. `/tank-game.html`.
+Every machine plays an attract demo when nobody's on it and keeps a
+high-score table; the letter board by the jukebox shows tonight's best on
+each. Each game also runs on its own page, e.g. `/tank-game.html`.
 
 ## Project layout
 
 ```
-arcade-environment/     the 3D room
-  src/index.js          bootstrap, state machine (intro/walking/playing), input, render loop
-  src/room.js           walls, carpet, lights, signs, hall of fame, props…
-  src/props/            interactive machines and people (claw machine, jukebox, patrons)
-  src/atmosphere.js     light shafts, dust, reflective aisle, the rainy street outside
-  src/audioReactive.js  taps the master bus so visuals can pulse with the music
-  src/cabinet.js        cabinet model, CRT screen shader, marquee, controls, game hosting
-  src/lightmap.js       baked lighting for the room's big surfaces (workers + lightmapKernel.js)
-  src/staticBatch.js    merges everything that never moves into a few draw calls
-  src/quality.js        quality tiers and the frame-rate governor
-  src/player.js         first-person movement and collision
-  src/hud.js            DOM overlays (intro, pause, prompts)
-  src/ambience.js       room tone and footsteps
-  src/textures.js       procedural textures (carpet, posters, neon signs), painted over with artwork
-  static/cabinet/       cabinet model (glTF) and its Blender source
-assets/
-  icons/                favicon, touch icon and PWA icons (wired in by games/shared/icons.js)
-  iconography/          brand marks, game emblems and UI icons (see its README)
-  generated/posters/    AI-painted wall posters; masters plus web/ copies the app loads
-  generated/prompts/    the Codex briefs used to paint the posters
-games/
-  shared/               framework every game builds on (see games/README.md); art.js and icons.js hold the shared artwork
-  tank-game/  neon-racer/  star-swarm/  brick-blitz/  neon-snake/
-scripts/shot.mjs        headless Chromium playtest/screenshot helper
-scripts/profile.mjs     CPU profile of the load and of walking around
+diorama/
+  index.html            title card, HUD and every bit of interface styling
+  src/index.js          builds the corner, wires interactions, runs the loop
+  src/stage.js          renderer, bloom and the finishing (grade) pass
+  src/cameraRig.js      the orbit-on-a-leash camera, parallax and flights
+  src/interaction.js    hover/click picking with springy feedback
+  src/ui.js             DOM layer: loader, labels, toasts, in-game chrome
+  src/power.js          the ignition sequence every light registers with
+  src/batch.js          merges everything static into a few draw calls
+  src/palette.js        every colour in the scene, and each machine's livery
+  src/layout.js         the footprint of the street, pavement and room
+  src/scene/            the void, the street "layer cake", the building, lights
+  src/props/            cabinets, signs, counter & cat, jukebox, rocket, street furniture, car
+  src/fx/               rain, ripples, steam, and the puddles' planar reflection
+  src/audio/            the jukebox's records (music.js) and everything else (sfx.js)
+games/                  the cabinet games; see games/README.md
+assets/                 brand marks, game artwork and the icons
+scripts/                headless-Chromium helpers (see Testing)
 ```
 
 Adding a game? See [games/README.md](games/README.md).
 
 ## Testing
 
-`scripts/shot.mjs` drives the real app in headless Chromium: it sends key
-presses, evaluates expressions and saves screenshots.
+The helpers in `scripts/` drive the real app in headless Chromium.
 
 ```bash
+node scripts/look.mjs /tmp/overview.png "http://localhost:8080/?skip"    # one screenshot
+node scripts/closeups.mjs /tmp/cu cat jukebox sign                      # fixed close-up poses
+node scripts/interact.mjs /tmp/it                                       # real mouse: hover, click every toy, drag, zoom, play
 node scripts/shot.mjs "http://localhost:8080/brick-blitz.html?autostart" /tmp/bb
-node scripts/shot.mjs "http://localhost:8080/?nolock" /tmp/arcade steps.json
 ```
 
-Useful URL flags: `?autostart` (standalone games skip the click-to-play
-overlay), `?nolock` (the arcade runs without pointer lock), `?inputdebug`
-(an overlay showing the raw mouse deltas the browser delivers plus the
-current quality tier and frame time), `?raw=0` (use the OS-accelerated
-pointer instead of raw mouse input) and `?quality=potato|low|medium|high|ultra`
-(pin a quality tier instead of letting the governor choose). Mouse speed is adjusted in-game with `[` and `]` and
-remembered in localStorage. Both `?autostart` and `?nolock` expose
-debug handles: `window.game` and `window.arcade` (which includes
-`arcade.benchmark(frames)` for frame timing).
+`?skip` jumps past the title card, and `window.arcade` exposes the camera
+rig, the cabinets and the props for poking at from the console.
 
 ## Performance
 
-The room is built to be cheap to draw without giving anything up:
-
-- **Baked lighting.** The floor, ceiling and walls are lit by lightmaps
-  (`lightmap.js`, kernel in `lightmapKernel.js`) computed in Web Workers while
-  the page loads, using three.js's own light falloff plus soft shadows from
-  the machines and furniture. Those planes cover most of the screen and now
-  cost two texture taps a pixel instead of a loop over eighteen point lights.
-- **Static batching.** After a short simulated run-in, everything that never
-  moved is merged into one mesh per material and the rest gets its matrices
-  frozen (`staticBatch.js`). Parts that only move on input carry
-  `userData.dynamic = true`. Cabinet button caps are one instanced mesh per
-  machine, the street outside is two draw calls, rain falls in a vertex shader.
-- **One render state.** The aisle mirror renders as its own top-level pass
-  (not nested in `onBeforeRender`), and shaders are compiled once, against the
-  buffer they actually draw into.
-- **Quality tiers.** `quality.js` defines five tiers that scale render
-  resolution and a pixel budget, MSAA, bloom size, the mirror, how many lights
-  reach the dynamic objects (`light.userData.priority`: 0 essential, 1 mood,
-  2 luxury), light shafts, dust, CRT shader detail and how often attract-mode
-  screens refresh. A governor picks a starting tier from the GPU and device,
-  steps down as soon as the frame rate falls clearly under 60, and steps back
-  up (cautiously, with back-off) once frames have been pinned to the display
-  for a while. The settled tier is remembered in localStorage.
-
-Measuring: `?inputdebug` shows the tier and frame time, `arcade.benchmark(n,
-finish)` times a frame on the CPU (and GPU with `finish`),
-`node scripts/profile.mjs http://localhost:8080/?nolock` prints a sampling
-profile of the load and a few seconds of walking, and
-`SOFTWARE_GL=1 node scripts/shot.mjs …` runs the headless playtest on
-SwiftShader, a handy stand-in for a very weak GPU.
+- Static geometry is merged per material after the scene is built
+  (`batch.js`); anything that moves is flagged `userData.dynamic` and left
+  alone. The whole frame is roughly a thousand draw calls including three
+  shadow maps and the puddle reflection.
+- Rain, ripples and steam are pure vertex-shader work; nothing weather-related
+  is touched from JavaScript.
+- Attract screens redraw at 24 fps; the machine you're playing runs at full
+  rate and is uploaded straight from its canvas with `texSubImage2D`.
+- A resolution governor steps the pixel ratio down when frames run long and
+  (cautiously) back up once there's headroom.
 
 ## Credits
 

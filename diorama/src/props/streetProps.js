@@ -211,6 +211,39 @@ export function createVendingMachine(scene, { position, rotationY }) {
 
 // ---- small street things --------------------------------------------------------
 
+// A pair of coin-op newspaper boxes chained to the kerb.
+export function createNewsBoxes(scene, { position, rotationY = 0 }) {
+    const root = group(scene, { p: position, r: [0, rotationY, 0], name: 'news' });
+    const boxes = [
+        { color: '#c43d4f', title: 'THE NIGHT OWL', line: 'CAT WINS AGAIN' },
+        { color: '#2f5f9e', title: 'CITY LATE', line: 'RAIN, THEN MORE' },
+    ];
+    boxes.forEach((b, i) => {
+        const g = group(root, { p: [i * 0.5 - 0.25, 0, 0] });
+        const paint = new THREE.MeshPhysicalMaterial({ color: b.color, roughness: 0.4, clearcoat: 0.7 });
+        add(g, rbox(0.44, 0.55, 0.4, 0.03, 2), paint, { p: [0, 0.62, 0] });
+        add(g, rbox(0.36, 0.06, 0.36, 0.02, 2), paint, { p: [0, 0.93, 0] });
+        for (const x of [-0.17, 0.17]) for (const z of [-0.15, 0.15]) add(g, new THREE.CylinderGeometry(0.018, 0.018, 0.36, 8), mat('#2a2633', { rough: 0.5, metal: 0.7 }), { p: [x, 0.18, z] });
+        const face = canvasTexture(256, 256, (ctx, w, h) => {
+            ctx.fillStyle = '#d8d1c0';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#231e2b';
+            ctx.font = `800 27px ${FONTS.ui}`;
+            ctx.textAlign = 'center';
+            ctx.fillText(b.title, w / 2, 44);
+            ctx.fillRect(18, 56, w - 36, 3);
+            ctx.font = `700 23px ${FONTS.ui}`;
+            ctx.fillText(b.line, w / 2, 96);
+            ctx.fillStyle = '#6d6676';
+            ctx.fillRect(20, 116, 100, 110);
+            for (let y = 120; y < 226; y += 12) ctx.fillRect(134, y, 100, 5);
+        });
+        add(g, new THREE.PlaneGeometry(0.34, 0.3), new THREE.MeshStandardMaterial({ map: face, roughness: 0.3 }), { p: [0, 0.66, 0.202], cast: false });
+        add(g, rbox(0.1, 0.05, 0.02, 0.01, 1), mat('#d9d2e8', { rough: 0.2, metal: 1 }), { p: [0.12, 0.43, 0.205], cast: false });
+    });
+    return { root };
+}
+
 export function createHydrant(scene, { position }) {
     const root = group(scene, { p: position, name: 'hydrant' });
     const paint = new THREE.MeshPhysicalMaterial({ color: '#f2b62d', roughness: 0.45, clearcoat: 0.6 });

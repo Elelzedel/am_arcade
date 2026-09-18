@@ -38,12 +38,40 @@ export default class CameraRig {
 
     bind() {
         const el = this.dom;
+        // two fingers pinch to lean in; one finger (or the mouse) swings round
+        const touches = new Map();
+        let pinch = null;
+        const spread = () => {
+            const [a, b] = [...touches.values()];
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        };
         el.addEventListener('pointerdown', (e) => {
             if (!this.enabled || e.button !== 0) return;
+            if (e.pointerType === 'touch') {
+                touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                if (touches.size === 2) {
+                    this.drag = null;
+                    pinch = { d: spread(), dist: this.goal.dist };
+                    return;
+                }
+            }
             this.drag = { x: e.clientX, y: e.clientY, az: this.goal.az, el: this.goal.el, moved: 0 };
         });
+        const lift = (e) => {
+            touches.delete(e.pointerId);
+            if (touches.size < 2) pinch = null;
+        };
+        window.addEventListener('pointerup', lift);
+        window.addEventListener('pointercancel', lift);
         window.addEventListener('pointermove', (e) => {
             this.pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+            if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pinch && touches.size === 2 && this.enabled) {
+                this.goal.dist = clamp(pinch.dist * (pinch.d / Math.max(spread(), 1)), ...this.limits.dist);
+                this.idleTime = 0;
+                this.onInteract?.('zoom');
+                return;
+            }
             if (!this.drag) return;
             const dx = e.clientX - this.drag.x;
             const dy = e.clientY - this.drag.y;

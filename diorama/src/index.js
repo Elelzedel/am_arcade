@@ -17,7 +17,7 @@ import { createCounter } from './props/counter.js';
 import { createJukebox } from './props/jukebox.js';
 import { createRocketRide, createSnakePlant } from './props/interior.js';
 import {
-    createStreetLamp, createVendingMachine, createHydrant, createBench, createTrashCan, createPole, createStringLights, createOpenSign,
+    createStreetLamp, createVendingMachine, createHydrant, createNewsBoxes, createBench, createTrashCan, createPole, createStringLights, createOpenSign,
 } from './props/streetProps.js';
 import { createRain, createSteam } from './fx/weather.js';
 import { createPuddles } from './fx/puddles.js';
@@ -91,6 +91,7 @@ createOpenSign(scene, { position: [-2.2, ROOM.floor + ROOM.kneeH + 0.1, ROOM.max
 const lamp = createStreetLamp(scene, { position: [-4.55, WALK.top, 2.2], rotationY: Math.PI });
 const vending = createVendingMachine(scene, { position: [ROOM.maxX + ROOM.wallT + 0.4, WALK.top, -2.35], rotationY: Math.PI / 2 });
 createHydrant(scene, { position: [3.0, WALK.top, -0.6] });
+createNewsBoxes(scene, { position: [2.05, WALK.top, 1.95], rotationY: 0.25 });
 const bench = createBench(scene, { position: [-3.35, WALK.top, 2.05], rotationY: 0 });
 const trash = createTrashCan(scene, { position: [-2.0, WALK.top, 2.2] });
 createPole(scene, {
@@ -114,7 +115,11 @@ const car = createCar(scene, { laneZ: street.frontZ + 0.52 });
 car.onPass = (speed) => sfx.carPass((PLINTH.maxX - PLINTH.minX + 2.4) / speed);
 const rain = createRain(scene, { count: 1600 });
 const puddles = createPuddles(scene, { puddles: street.puddles });
-window.addEventListener('resize', () => puddles.resize(window.innerWidth, window.innerHeight));
+window.addEventListener('resize', () => {
+    puddles.resize(window.innerWidth, window.innerHeight);
+    // keep the tube framed if the window changes shape mid-game
+    if (state === 'playing' && active) rig.fixedPose = active.playPose(camera.aspect);
+});
 const steam = [
     createSteam(scene, { origin: street.manhole.clone().setY(0.03), count: 40, height: 1.9, spread: 0.45, size: 4.5, rate: 0.08, opacity: 0.07 }),
     createSteam(scene, { origin: bench.steamAt, count: 12, height: 0.4, spread: 0.05, size: 0.7, rate: 0.3, opacity: 0.16, color: '#f4efff' }),

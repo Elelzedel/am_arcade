@@ -66,4 +66,4 @@ Useful helpers: `this.isDown('left' | 'right' | 'up' | 'down' | 'action')`,
 
 1. Create `games/<dir>/src/game.js` and `games/<dir>/src/standalone.js`. Copy the latter from another game.
 2. Add `<dir>` to `GAMES` in `webpack.config.js`.
-3. Import the class in `arcade-environment/src/index.js`, add it to `GAMES`, and give it a spot in `LAYOUT`.
+3. Import the class in `diorama/src/index.js` and give it a spot in `LAYOUT`, then add its colours to `LIVERY` in `diorama/src/palette.js`.

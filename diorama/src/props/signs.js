@@ -121,7 +121,7 @@ export function createWallSigns(scene) {
 
     // "insert coin", above the three machines on the back wall
     const coin = neonPanel({
-        width: 1.9, height: 0.62, ppm: 380, intensity: 2.2,
+        width: 1.9, height: 0.62, ppm: 380, intensity: 1.8,
         draw(ctx, w, h, tube) {
             tube.text('insert coin', w * 0.46, h * 0.5, { font: `${h * 0.56}px ${FONTS.script}`, color: P.pink, width: h * 0.018, fill: true });
             // a coin, with an arrow into the slot
@@ -139,7 +139,7 @@ export function createWallSigns(scene) {
 
     // "GAME ON" arrow over the left-wall machines
     const gameOn = neonPanel({
-        width: 1.5, height: 0.6, ppm: 380, intensity: 2.2,
+        width: 1.5, height: 0.6, ppm: 380, intensity: 1.8,
         draw(ctx, w, h, tube) {
             tube.text('GAME ON', w * 0.5, h * 0.42, { font: `${h * 0.34}px ${FONTS.neon}`, color: P.mint, width: h * 0.012, fill: true });
             tube.path((c) => { c.moveTo(w * 0.18, h * 0.8); c.lineTo(w * 0.82, h * 0.8); c.moveTo(w * 0.76, h * 0.7); c.lineTo(w * 0.83, h * 0.8); c.lineTo(w * 0.76, h * 0.9); }, { color: P.violet, width: h * 0.02 });

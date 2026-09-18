@@ -118,7 +118,7 @@ export function createJukebox(scene, { position, rotationY }) {
         stripTex.needsUpdate = true;
     };
     drawStrip(TRACKS[0], false);
-    add(root, new THREE.PlaneGeometry(0.46, 0.086), new THREE.MeshStandardMaterial({ map: stripTex, roughness: 0.5, emissive: '#fff', emissiveMap: stripTex, emissiveIntensity: 0.45 }), { p: [0, 0.8, D / 2 + 0.018], cast: false });
+    add(root, new THREE.PlaneGeometry(0.46, 0.086), new THREE.MeshStandardMaterial({ map: stripTex, roughness: 0.5, emissive: '#fff', emissiveMap: stripTex, emissiveIntensity: 0.18 }), { p: [0, 0.8, D / 2 + 0.018], cast: false });
     // selector buttons
     for (let i = 0; i < 8; i++) add(root, rbox(0.04, 0.03, 0.03, 0.008, 1), mat(i % 2 ? '#f4e8cf' : '#ffb347', { rough: 0.4 }), { p: [-0.175 + i * 0.05, 0.72, D / 2 + 0.02], cast: false });
 
@@ -135,7 +135,7 @@ export function createJukebox(scene, { position, rotationY }) {
             uniform float time, level; uniform vec3 color; varying vec2 vUv;
             float hash(float n) { return fract(sin(n) * 43758.5453); }
             void main() {
-                vec3 c = color * 1.2;
+                vec3 c = color * 0.75;
                 float b = 0.0;
                 for (int i = 0; i < 7; i++) {
                     float fi = float(i);
@@ -144,7 +144,7 @@ export function createJukebox(scene, { position, rotationY }) {
                     vec2 d = (vUv - vec2(x, y)) * vec2(1.0, 7.0);
                     b += smoothstep(0.2, 0.12, length(d)) - smoothstep(0.12, 0.05, length(d)) * 0.5;
                 }
-                c += vec3(b) * 1.4;
+                c += vec3(b) * 0.9;
                 gl_FragColor = vec4(c * level, 1.0);
             }
         `,
