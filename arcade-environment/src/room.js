@@ -160,7 +160,20 @@ export function buildRoom(scene, { games }) {
         mat.map = wallMat.map.clone();
         mat.map.repeat.set(wall.w / 2, 1.5);
         mat.map.needsUpdate = true;
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wall.w, H), mat);
+        let wallGeometry;
+        if (wall.ry === Math.PI) {
+            // The street is real geometry outside now, so the doorway must be
+            // an actual opening rather than a picture covering an intact wall.
+            const outline = new THREE.Shape();
+            [[-W/2,-H/2],[-1.24,-H/2],[-1.24,2.3-H/2],[1.24,2.3-H/2],
+                [1.24,-H/2],[W/2,-H/2],[W/2,H/2],[-W/2,H/2]].forEach(([x,y],i) =>
+                i ? outline.lineTo(x,y) : outline.moveTo(x,y));
+            outline.closePath();
+            wallGeometry = new THREE.ShapeGeometry(outline);
+            const pos = wallGeometry.attributes.position, uv = wallGeometry.attributes.uv;
+            for (let i=0; i<uv.count; i++) uv.setXY(i,pos.getX(i)/W+.5,pos.getY(i)/H+.5);
+        } else wallGeometry = new THREE.PlaneGeometry(wall.w, H);
+        const mesh = new THREE.Mesh(wallGeometry, mat);
         mesh.position.set(wall.x, H / 2, wall.z);
         mesh.rotation.y = wall.ry;
         scene.add(mesh);
@@ -263,7 +276,7 @@ export function buildRoom(scene, { games }) {
     // ---- entrance -------------------------------------------------------------
     const doorFrameMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, metalness: 0.7, roughness: 0.3 });
     const glassMat = new THREE.MeshStandardMaterial({
-        color: 0x0a1830, emissive: new THREE.Color(0x0b1f3a), emissiveIntensity: 1, roughness: 0.1, metalness: 0.2,
+        color: 0x84979f, transparent: true, opacity: 0.055, depthWrite: false, roughness: 0.16, metalness: 0.1,
     });
     for (const side of [-1, 1]) {
         const x = cx + side * 0.62;

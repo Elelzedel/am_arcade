@@ -69,7 +69,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05030a);
 scene.fog = new THREE.Fog(0x05030a, 12, 26);
 
-const camera = new THREE.PerspectiveCamera(WALK_FOV, window.innerWidth / window.innerHeight, 0.05, 60);
+const camera = new THREE.PerspectiveCamera(WALK_FOV, window.innerWidth / window.innerHeight, 0.05, 90);
 scene.add(camera);
 
 const quality = createQuality({ renderer, override: QUALITY_OVERRIDE, onChange: () => applyQuality() });

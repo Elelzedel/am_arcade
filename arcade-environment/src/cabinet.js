@@ -262,8 +262,8 @@ export default class Cabinet {
         // pixel a loop iteration.
         this.light = null;
         if (!this.broken) {
-            this.light = new THREE.PointLight(this.color, 1.6, 3.2, 1.6);
-            this.light.position.set(0, 1.25, 1.2);
+            this.light = new THREE.PointLight(this.color, 0.38, 1.8, 2);
+            this.light.position.set(0, 1.25, 0.88);
             this.light.userData.priority = 0;
             this.group.add(this.light);
         }
@@ -498,7 +498,7 @@ export default class Cabinet {
         // Screen spill light with a slight CRT shimmer. (Sampling the actual
         // screen colour would need a GPU readback, which stalls the frame.)
         if (!this.broken) {
-            this.light.intensity = 1.6 * (0.92 + 0.08 * Math.sin(this.time * 7.3) * Math.sin(this.time * 2.1));
+            this.light.intensity = 0.38 * (0.98 + 0.02 * Math.sin(this.time * 7.3) * Math.sin(this.time * 2.1));
         }
 
         // Joystick and buttons mirror the player's input.
@@ -534,7 +534,9 @@ export default class Cabinet {
     }
 
     renderFrame(renderer) {
-        this.frameTimer = Math.max(this.interval, this.frameTimer + this.interval);
+        // Startup primes every screen, including off-camera cabinets whose interval
+        // is Infinity. Never let that visibility sentinel poison the countdown.
+        this.frameTimer = Number.isFinite(this.interval) ? this.interval : 0;
         // Step in chunks the base class accepts so skipped frames don't cause slow motion.
         let remaining = Math.min(this.pendingDt, 0.25);
         while (remaining > 1e-4) {
@@ -542,6 +544,8 @@ export default class Cabinet {
             this.game.frame(step);
             remaining -= step;
         }
+        // A zero-dt startup frame still needs to paint the attract screen.
+        if (this.pendingDt === 0) this.game.frame(0);
         this.pendingDt = 0;
         this.uploadScreen(renderer);
     }

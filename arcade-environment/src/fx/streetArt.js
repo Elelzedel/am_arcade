@@ -56,6 +56,25 @@ export function createBlockTexture() {
                     `rgb(${rgb.map((v) => v + tone).join(',')})`);
             }
         }
+        // Decades of runoff and repairs: broad damp patches, soot under the
+        // cornice, uneven mortar and small chips at different physical scales.
+        for (let i = 0; i < w * 9; i++) {
+            const px = a + random() * w, py = random() * h;
+            const radius = 0.12 + random() * 1.1;
+            const stain = ctx.createRadialGradient(x(px), y(py), 0, x(px), y(py), radius * scale);
+            stain.addColorStop(0, `rgba(9,17,21,${0.08 + random() * 0.2})`);
+            stain.addColorStop(1, 'rgba(9,17,21,0)');
+            rect(px - radius, py - radius, radius * 2, radius * 2, stain);
+        }
+        for (let i = 0; i < w * 22; i++) {
+            const px = a + random() * w, len = 0.15 + random() * 2.6;
+            rect(px, h - len, 0.008 + random() * 0.045, len, '#0b151b26');
+        }
+        for (let i = 0; i < w * h * 45; i++) {
+            rect(a + random() * w, random() * h, 0.012 + random() * 0.035, 0.008 + random() * 0.014,
+                random() > .5 ? '#b1a48d19' : '#0b151c30');
+        }
+        line([[a + w * .2, 2.7], [a + w * .22, 2.1], [a + w * .2, 1.8], [a + w * .23, 1.3]], '#151d2470', .012);
         ctx.restore();
         rect(a, h - 0.25, w, 0.16, '#44434a');
         rect(a - 0.06, h - 0.09, w + 0.12, 0.09, '#697079');

@@ -162,13 +162,6 @@ function beamMaterial({ color, intensity, decay, nearFade, farFade, jitter }) {
     });
 }
 
-// Bright hues bloom far harder than dark ones; even out the perceived punch.
-function normalise(color, base = 0.34) {
-    const c = new THREE.Color(color);
-    const luminance = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-    return THREE.MathUtils.clamp(base / Math.max(luminance, 0.06), 0.45, 1.5);
-}
-
 const SHAFT_LENGTH = 2.35;
 
 export function createBeams({ room }) {
@@ -183,7 +176,7 @@ export function createBeams({ room }) {
     panels.forEach(([x, z], i) => {
         const material = beamMaterial({
             color: 0xffe3bc,
-            intensity: 0.062,
+            intensity: 0.016,
             decay: 2.0,
             nearFade: [0.5, 1.9],
             farFade: [9, 17],
@@ -196,46 +189,17 @@ export function createBeams({ room }) {
         group.add(shaft);
         materials.push(material);
         // The panel over the entrance is the tired one that stutters.
-        shafts.push({ material, mesh: shaft, base: 0.062, flicker: i === 4 });
+        shafts.push({ material, mesh: shaft, base: 0.016, flicker: i === 4 });
     });
-
-    // ---- cabinet CRTs ---------------------------------------------------------
-    const crtGeometry = shellGeometry(roundedRectSection(18, 0.5), [0.30, 0.23], [0.86, 0.72], 2.4, 6);
-    const crts = [];
-
-    function addCabinets(cabinets) {
-        for (const cabinet of cabinets) {
-            if (!cabinet.light || cabinet.light.intensity <= 0) continue; // dead machine, no glow
-            const material = beamMaterial({
-                color: cabinet.color,
-                intensity: 0.24 * normalise(cabinet.color),
-                decay: 2.0,
-                nearFade: [0.55, 2.2],
-                farFade: [11, 19],
-                jitter: 0.12,
-            });
-            material.uniforms.uColor.value.multiplyScalar(1.0);
-            const beam = new THREE.Mesh(crtGeometry, material);
-            // Local +z is the way the cabinet faces; tip the cone down so the
-            // light pools on the aisle instead of hanging in the air.
-            beam.position.set(0, 1.30, 0.60);
-            beam.rotation.x = 0.17;
-            beam.renderOrder = 6;
-            cabinet.group.add(beam);
-            crts.push({ cabinet, material, base: material.uniforms.uIntensity.value, beam });
-        }
-    }
 
     let time = 0;
     let flicker = 1;
     let flickerTimer = 5;
     let showShafts = true;
-    let showCrts = true;
 
-    // Quality tier knob: 'all', 'crt' (only the screens' glow) or 'none'.
+    // Only ceiling fixtures scatter visible light; CRTs softly light nearby surfaces.
     function setQuality(mode) {
         showShafts = mode === 'all';
-        showCrts = mode !== 'none';
     }
 
     function update(dt, camera, { focus = 0 } = {}) {
@@ -259,19 +223,8 @@ export function createBeams({ room }) {
             shaft.mesh.visible = showShafts && value > 0.002;
         }
 
-        for (const crt of crts) {
-            crt.material.uniforms.uTime.value = time;
-            // Follow the screen's own shimmer, and get out of the way entirely
-            // while somebody is nose-to-glass playing this machine.
-            const shimmer = 0.85 + 0.15 * Math.sin(time * 7.3 + crt.base * 120) * Math.sin(time * 2.1);
-            const mine = crt.cabinet.active ? 0 : 1;
-            const value = crt.base * shimmer * mine * (1 - focus * 0.7);
-            crt.material.uniforms.uIntensity.value = value;
-            // Skip the draw entirely when it would contribute nothing: at the
-            // play pose the camera sits inside this shell.
-            crt.beam.visible = showCrts && value > 0.002;
-        }
+
     }
 
-    return { group, addCabinets, update, setQuality, panels, shaftLength: SHAFT_LENGTH };
+    return { group, update, setQuality, panels, shaftLength: SHAFT_LENGTH };
 }

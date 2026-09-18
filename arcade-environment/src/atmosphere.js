@@ -56,7 +56,6 @@ export function createAtmosphere(scene, { room }) {
 
     function addCabinets(list) {
         cabinets = list;
-        beams.addCabinets(list);
         dust.build(list);
     }
 
