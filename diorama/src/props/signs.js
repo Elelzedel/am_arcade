@@ -225,7 +225,7 @@ export function createClock(scene, { position, rotationY = 0 }) {
         ctx.fillStyle = '#e8407f';
         ctx.fillText('AM', w / 2, w * 0.68);
     });
-    add(root, new THREE.CircleGeometry(R * 0.9, 48), new THREE.MeshStandardMaterial({ map: face, roughness: 0.5, emissive: '#fff1d6', emissiveMap: face, emissiveIntensity: 0.18 }), { p: [0, 0, 0.051], cast: false });
+    add(root, new THREE.CircleGeometry(R * 0.9, 48), new THREE.MeshStandardMaterial({ map: face, roughness: 0.5, emissive: '#fff1d6', emissiveMap: face, emissiveIntensity: 0.18 }), { p: [0, 0, 0.056], cast: false });
     // neon ring
     const ringMat = glowMat(P.cyan, 2.4);
     add(root, new THREE.TorusGeometry(R * 0.95, 0.012, 8, 64), ringMat, { p: [0, 0, 0.06], cast: false });

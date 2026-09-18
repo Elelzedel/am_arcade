@@ -599,6 +599,23 @@ rig.fixedPose = titlePose;
 rig.enabled = false;
 interaction.enabled = false;
 
+// Depth precision is spent between the near and far planes, so they hug the
+// scene: from far away (a phone held upright backs the camera right off) the
+// near plane moves out with the distance; up close it comes back in. With a
+// fixed 0.1 m near plane, surfaces a few millimetres apart fought each other.
+const lookAt = new THREE.Vector3();
+function fitClipPlanes() {
+    lookAt.copy(rig.lookTarget || rig.target);
+    const d = camera.position.distanceTo(lookAt);
+    const near = Math.min(4, Math.max(0.05, d * 0.06));
+    const far = Math.max(60, d + 45);
+    if (Math.abs(near - camera.near) > camera.near * 0.02 || Math.abs(far - camera.far) > 1) {
+        camera.near = near;
+        camera.far = far;
+        camera.updateProjectionMatrix();
+    }
+}
+
 function frame() {
     const dt = Math.min(clockTime.getDelta(), 0.1);
     time += dt;
@@ -617,6 +634,7 @@ function frame() {
             camera.updateProjectionMatrix();
         }
     }
+    fitClipPlanes();
     updateWalls();
     building.update(dt);
     power.update(dt, time);
