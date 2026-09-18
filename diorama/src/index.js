@@ -295,7 +295,7 @@ const prizeLines = ['That one\u2019s 5,000 tickets.', 'You have 0 tickets. Pixel
 let prizePokes = 0;
 interaction.add({
     id: 'prizes', name: 'The prize wall', sub: 'plush, trinkets, one very big bear &nbsp;·&nbsp; <b>poke</b>', color: '#ffb347',
-    meshes: allMeshes(counter.prizeShelf), root: counter.prizeShelf,
+    meshes: allMeshes(counter.prizeShelf), root: counter.prizeShelf, bounce: false,
     onClick: () => {
         const bear = counter.wiggle();
         sfx.boing();

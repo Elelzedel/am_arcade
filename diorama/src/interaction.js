@@ -70,7 +70,12 @@ export default class Interaction {
         this.ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
     }
 
+    /**
+     * item.bounce = false for things too big to bounce as a whole (the prize
+     * wall): they animate their own parts instead.
+     */
     add(item) {
+        item.bounce = item.bounce !== false;
         item.scale = 1;
         item.velocity = 0;
         item.target = 1;
@@ -108,9 +113,21 @@ export default class Interaction {
 
     click(item) {
         // squash, then spring back
-        item.velocity = Math.min(item.velocity, -2.2);
+        if (item.bounce) item.velocity = Math.min(item.velocity, -2.2);
         item.onClick?.();
         if (this.hovered === item) this.ui.label(item, this.client.x, this.client.y);
+    }
+
+    // Losing the hover needs a moment's grace: a bouncing prop can slip out
+    // from under a still cursor and back, and must not flicker in and out.
+    hover(item, dt) {
+        if (item) {
+            this.grace = 0.15;
+            this.setHovered(item);
+        } else if (this.hovered) {
+            this.grace = (this.grace || 0) - dt;
+            if (this.grace <= 0 || this.ndc.x > 1.5) this.setHovered(null);
+        }
     }
 
     setHovered(item) {
@@ -122,9 +139,11 @@ export default class Interaction {
         this.hovered = item;
         if (item) {
             item.onHover?.(true);
-            item.target = 1.025;
-            // a nudge, not an accumulation: rapid hover in/out can't stack up
-            item.velocity = Math.max(item.velocity, 0.9);
+            if (item.bounce) {
+                item.target = 1.025;
+                // a nudge, not an accumulation: rapid hover in/out can't stack up
+                item.velocity = Math.max(item.velocity, 0.9);
+            }
             sfx.hover();
         }
         document.body.classList.toggle('hovering', !!item);
@@ -134,11 +153,9 @@ export default class Interaction {
         if (!this.enabled) {
             if (this.hovered) this.setHovered(null);
             this.ui.hideLabel();
-        } else if (this.center) {
-            this.setHovered(this.pick());
-        } else if (this.dirty && !this.rig.isDragging) {
+        } else if (this.center || (this.dirty && !this.rig.isDragging) || this.hovered) {
             this.dirty = false;
-            this.setHovered(this.pick());
+            this.hover(this.pick(), dt);
         }
         if (this.hovered && this.enabled && !this.rig.isDragging) {
             if (this.center) this.ui.label(this.hovered, window.innerWidth / 2 + 6, window.innerHeight / 2 + 4);
