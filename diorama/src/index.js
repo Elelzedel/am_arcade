@@ -33,6 +33,7 @@ import { POSTERS } from '../../games/shared/art.js';
 import Interface from './ui.js';
 import Interaction from './interaction.js';
 import TouchControls, { SCHEMES, TOUCH_PROMPTS } from './touch.js';
+import FlatScreen from './flatScreen.js';
 
 import TankGame from '../../games/tank-game/src/game.js';
 import NeonRacer from '../../games/neon-racer/src/game.js';
@@ -343,6 +344,7 @@ async function play(cabinet) {
     active.returnTo = from;
     cabinet.setActive(true);
     touch?.show(cabinet.meta.id, cabinet.color);
+    flat?.show(cabinet.canvas, cabinet.color, cabinet.screenRect(camera));
     for (const c of cabinets) c.setDetail(c === cabinet);
     jukebox.setDuck(1);
     sfx.setFocus(1);
@@ -354,10 +356,12 @@ async function leave() {
     if (state !== 'playing') return;
     state = 'flying';
     const cabinet = active;
+    // let go of every touch control while the game is still the active one
+    touch?.hide();
     active = null;
     for (const code of held) cabinet.keyUp(code);
     held.clear();
-    touch?.hide();
+    await flat?.hide(cabinet.screenRect(camera));
     cabinet.setActive(false);
     jukebox.setDuck(0);
     sfx.setFocus(0);
@@ -501,15 +505,19 @@ window.addEventListener('blur', () => {
 function playLayout() {
     const h = window.innerHeight;
     if (!TOUCH) return { top: 0.07, bottom: 0.07 };
-    return camera.aspect < 1 ? { top: 76 / h, bottom: 0.42 } : { top: 56 / h, bottom: 0.03, margin: 1.04 };
+    // on a phone, park the tube exactly behind where the full-size screen will be
+    const r = flat.target();
+    return { top: r.top / h, bottom: 1 - (r.top + r.height) / h, margin: 1.0 };
 }
 
 const touch = TOUCH ? new TouchControls({
     keyDown: (code) => active?.keyDown(code, false),
     keyUp: (code) => active?.keyUp(code),
     game: () => active?.game,
-    screenRect: () => active.screenRect(camera),
+    screenRect: () => (flat?.active ? flat.screenRect() : active.screenRect(camera)),
 }) : null;
+// on phones the game lifts out of the tube to fill the screen
+const flat = TOUCH ? new FlatScreen() : null;
 window.addEventListener('resize', () => {
     // keep the tube framed if the window changes shape mid-game
     if (state === 'playing' && active) rig.fixedPose = active.playPose(camera.aspect, playLayout());

@@ -49,6 +49,7 @@ for (const s of steps) {
             await wait((s.ms || 240) / n);
         }
         if (s.hold) await wait(s.hold);
+        if (s.evalHeld) console.log('[evalHeld]', JSON.stringify(await page.evaluate(s.evalHeld)));
         if (s.shotHeld) {
             await page.screenshot({ path: `${prefix}-${s.shotHeld}.png` });
             console.log('[shot]', s.shotHeld);

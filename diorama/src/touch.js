@@ -23,7 +23,7 @@ export const SCHEMES = {
         controls: [['STICK UP/DOWN', 'AIM BARREL'], ['STICK LEFT/RIGHT', 'SHOT POWER'], ['FIRE', 'FIRE'], ['DRIVE', 'MOVE (FUEL)'], ['WEAPON', 'SWAP WEAPON']],
     },
     'neon-racer': {
-        stick: '8way',
+        stick: 'analog',
         buttons: [{ label: 'BOOST', key: 'Space', big: true }],
         hint: 'thumb down anywhere on the left to steer',
         controls: [['STICK', 'STEER'], ['HOLD BOOST', 'BOOST'], ['ORBS', 'POINTS + BOOST'], ['3 SHIELDS', 'THEN CRASH']],
@@ -119,7 +119,7 @@ export default class TouchControls {
         this.pointers.clear();
         this.stickEl.classList.remove('on');
         const g = this.scheme && this.host.game();
-        if (g) { g.paddleTarget = null; g.moveTarget = null; g.autoFire = false; }
+        if (g) { g.paddleTarget = null; g.moveTarget = null; g.autoFire = false; g.stickInput = null; }
         this.scheme = null;
     }
 
@@ -201,6 +201,7 @@ export default class TouchControls {
             if (p.role === 'stick') {
                 this.stickEl.classList.remove('on');
                 for (const k of Object.values(ARROWS)) this.release(k);
+                if (g) g.stickInput = null;
             } else if (p.role === 'fly' && g) {
                 if (![...this.pointers.values()].some((q) => q.role === 'fly')) {
                     g.moveTarget = null;
@@ -218,12 +219,23 @@ export default class TouchControls {
     // The knob follows the thumb inside its ring; the direction turns into
     // arrow keys (four ways or eight).
     stick(p) {
-        const R = 46;
+        const R = 58;
         let dx = p.x - p.x0, dy = p.y - p.y0;
         const len = Math.hypot(dx, dy);
         if (len > R) { dx = (dx / len) * R; dy = (dy / len) * R; }
         this.knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         const x = dx / R, y = dy / R;
+        if (this.scheme.stick === 'analog') {
+            // true analog: a small radial dead zone, then the exact deflection,
+            // eased so fine corrections near the centre stay fine
+            const m = Math.hypot(x, y);
+            const g = this.host.game();
+            if (!g) return;
+            if (m < 0.08) { g.stickInput = { x: 0, y: 0 }; return; }
+            const k = Math.pow((m - 0.08) / 0.92, 1.35) / m;
+            g.stickInput = { x: x * k, y: -y * k };
+            return;
+        }
         const want = new Set();
         if (this.scheme.stick === '4way') {
             if (Math.max(Math.abs(x), Math.abs(y)) > 0.35) {

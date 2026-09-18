@@ -232,6 +232,12 @@ export default class NeonRacer extends ArcadeGame {
         } else {
             ax = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
             ay = (this.isDown('up') ? 1 : 0) - (this.isDown('down') ? 1 : 0);
+            // A touch host can set stickInput ({x, y} in -1..1, up positive):
+            // an analog stick steers proportionally instead of all-or-nothing.
+            if (this.stickInput) {
+                ax = this.stickInput.x;
+                ay = this.stickInput.y;
+            }
             wantBoost = this.isDown('action');
         }
 
